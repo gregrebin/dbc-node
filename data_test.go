@@ -49,13 +49,13 @@ func init() {
 
 func initKeys() {
 	_ = exec.Command("./key.sh", ecParamFile, requirerPrivKeyFile, requirerPubKeyFile).Run()
-	requirerPrivKey, requirerPubKey = loadKeys(requirerPrivKeyFile, requirerPubKeyFile)
+	requirerPrivKey, requirerPubKey = LoadKeys(requirerPrivKeyFile, requirerPubKeyFile)
 	_ = exec.Command("./key.sh", ecParamFile, validatorPrivKeyFile, validatorPubKeyFile).Run()
-	validatorPrivKey, validatorPubKey = loadKeys(validatorPrivKeyFile, validatorPubKeyFile)
+	validatorPrivKey, validatorPubKey = LoadKeys(validatorPrivKeyFile, validatorPubKeyFile)
 	_ = exec.Command("./key.sh", ecParamFile, providerPrivKeyFile, providerPubKeyFile).Run()
-	providerPrivKey, providerPubKey = loadKeys(providerPrivKeyFile, providerPubKeyFile)
+	providerPrivKey, providerPubKey = LoadKeys(providerPrivKeyFile, providerPubKeyFile)
 	_ = exec.Command("./key.sh", ecParamFile, acceptorPrivKeyFile, acceptorPubKeyFile).Run()
-	acceptorPrivKey, acceptorPubKey = loadKeys(acceptorPrivKeyFile, acceptorPubKeyFile)
+	acceptorPrivKey, acceptorPubKey = LoadKeys(acceptorPrivKeyFile, acceptorPubKeyFile)
 }
 
 func initZpk() {
@@ -73,11 +73,11 @@ func initZpk() {
 
 func TestEmptyState(t *testing.T) {
 	state := NewState()
-	checkNil(state.dataList, "Data list", t)
+	checkNil(state.DataList, "Data list", t)
 	validHash := sha256.Sum256(nil)
-	checkHash(state.stateHash, validHash[:], "Empty state", t)
-	checkHash(state.hash(), validHash[:], "Hash function return", t)
-	checkHash(state.stateHash, validHash[:], "Empty state after hash function", t)
+	checkHash(state.StateHash, validHash[:], "Empty state", t)
+	checkHash(state.Hash(), validHash[:], "Hash function return", t)
+	checkHash(state.StateHash, validHash[:], "Empty state after hash function", t)
 
 }
 
@@ -92,55 +92,55 @@ func TestAddData(t *testing.T) {
 }
 
 func checkValidData(state *State, t *testing.T) {
-	initialLength := len(state.dataList)
+	initialLength := len(state.DataList)
 	otherDataHash, _ := dataHash(state, initialLength)
 
-	description := makeDescription()
-	state.addData(description)
-	data := state.dataList[initialLength]
+	description := mockDescription()
+	state.AddData(description)
+	data := state.DataList[initialLength]
 
-	checkLength(state.dataList, initialLength + 1, "Data list", t)
-	checkNil(data.versionList, "Version list", t)
-	compareDescription(data.description, description, t)
-	dataHash := sha256.Sum256(description.hash())
-	checkHash(data.dataHash, dataHash[:], "Data", t)
+	checkLength(state.DataList, initialLength+1, "Data list", t)
+	checkNil(data.VersionList, "Version list", t)
+	compareDescription(data.Description, description, t)
+	dataHash := sha256.Sum256(description.Hash())
+	checkHash(data.DataHash, dataHash[:], "Data", t)
 	stateHash := sha256.Sum256(append(otherDataHash, dataHash[:]...))
-	checkHash(state.stateHash, stateHash[:], "State", t)
+	checkHash(state.StateHash, stateHash[:], "State", t)
 }
 
-func makeDescription() Description {
+func mockDescription() Description {
 	providerInfo := []byte(lorem.Sentence(10, 20))
 	dataInfo := []byte(lorem.Sentence(10, 20))
-	signature := sign(requirerPrivKey, append(providerInfo, dataInfo...))
+	signature := Sign(requirerPrivKey, append(providerInfo, dataInfo...))
 	description := Description{
-		providerInfo:      providerInfo,
-		dataInfo:          dataInfo,
-		trustedValidators: [][]byte{validatorPubKey},
-		acceptor:          acceptorPubKey,
-		requirer:          requirerPubKey,
-		signature:         signature,
+		ProviderInfo:      providerInfo,
+		DataInfo:          dataInfo,
+		TrustedValidators: [][]byte{validatorPubKey},
+		Acceptor:          acceptorPubKey,
+		Requirer:          requirerPubKey,
+		Signature:         signature,
 	}
 	return description
 }
 
 func compareDescription(desc1, desc2 Description, t *testing.T) {
-	if bytes.Compare(desc1.providerInfo, desc2.providerInfo) != 0 {
+	if bytes.Compare(desc1.ProviderInfo, desc2.ProviderInfo) != 0 {
 		t.Errorf("Corrupted provider info")
 	}
-	if bytes.Compare(desc1.dataInfo, desc2.dataInfo) != 0 {
+	if bytes.Compare(desc1.DataInfo, desc2.DataInfo) != 0 {
 		t.Errorf("Corrupted data info")
 	}
-	if bytes.Compare(desc1.trustedValidators[0], desc2.trustedValidators[0]) != 0 {
+	if bytes.Compare(desc1.TrustedValidators[0], desc2.TrustedValidators[0]) != 0 {
 		t.Errorf("Corrupted trusted validator")
 	}
-	if bytes.Compare(desc1.acceptor, desc2.acceptor) != 0 {
-		t.Errorf("Corrupted acceptor")
+	if bytes.Compare(desc1.Acceptor, desc2.Acceptor) != 0 {
+		t.Errorf("Corrupted Acceptor")
 	}
-	if bytes.Compare(desc1.requirer, desc2.requirer) != 0 {
-		t.Errorf("Corrupted requirer")
+	if bytes.Compare(desc1.Requirer, desc2.Requirer) != 0 {
+		t.Errorf("Corrupted Requirer")
 	}
-	if bytes.Compare(desc1.signature, desc2.signature) != 0 {
-		t.Errorf("Corrupted signature")
+	if bytes.Compare(desc1.Signature, desc2.Signature) != 0 {
+		t.Errorf("Corrupted Signature")
 	}
 }
 
@@ -157,7 +157,7 @@ func TestAddValidation(t *testing.T) {
 	checkValidation(state, 2, zpks[4], t)
 	checkValidation(state, 2, zpks[5], t)
 
-	// TODO: check invalid validation (wrong signature, etc.)
+	// TODO: check invalid validation (wrong Signature, etc.)
 }
 
 func checkValidation(state *State, dataIndex int, zpk zpk, t *testing.T) {
@@ -165,45 +165,45 @@ func checkValidation(state *State, dataIndex int, zpk zpk, t *testing.T) {
 	dataHashL, dataHashR := dataHash(state, dataIndex)
 	otherVersionHash, _ := versionHash(state, dataIndex, versionLength) // since we add a new version, we will have only versions at the left
 
-	validation := makeValidation(zpk)
-	state.addValidation(validation, dataIndex)
-	data := state.dataList[dataIndex]
-	version := state.dataList[dataIndex].versionList[versionLength]
+	validation := mockValidation(zpk)
+	state.AddValidation(validation, dataIndex)
+	data := state.DataList[dataIndex]
+	version := state.DataList[dataIndex].VersionList[versionLength]
 
-	checkLength(state.dataList, dataLength, "Data list", t)
-	checkLength(state.dataList[dataIndex].versionList, versionLength + 1, "Version list", t)
-	checkEmpty(&version.acceptedPayload, "Accepted payload", t)
-	checkEmpty(&version.payload, "Payload", t)
-	compareValidation(version.validation, validation, t)
+	checkLength(state.DataList, dataLength, "Data list", t)
+	checkLength(state.DataList[dataIndex].VersionList, versionLength+1, "Version list", t)
+	checkEmpty(&version.AcceptedPayload, "Accepted payload", t)
+	checkEmpty(&version.Payload, "Payload", t)
+	compareValidation(version.Validation, validation, t)
 	emptyAcceptedPayload := AcceptedPayload{}
 	emptyPayload := Payload{}
-	versionHash := sha256.Sum256(append(append(emptyAcceptedPayload.hash(), emptyPayload.hash()...), validation.hash()...))
-	checkHash(version.versionHash, versionHash[:], "Version", t)
-	dataHash := sha256.Sum256(append(append(data.description.hash(), otherVersionHash...), versionHash[:]...))
-	checkHash(data.dataHash, dataHash[:], "Data", t)
+	versionHash := sha256.Sum256(append(append(emptyAcceptedPayload.Hash(), emptyPayload.Hash()...), validation.Hash()...))
+	checkHash(version.VersionHash, versionHash[:], "Version", t)
+	dataHash := sha256.Sum256(append(append(data.Description.Hash(), otherVersionHash...), versionHash[:]...))
+	checkHash(data.DataHash, dataHash[:], "Data", t)
 	stateHash := sha256.Sum256(append(append(dataHashL, dataHash[:]...), dataHashR...))
-	checkHash(state.stateHash, stateHash[:], "State", t)
+	checkHash(state.StateHash, stateHash[:], "State", t)
 }
 
-func makeValidation(zpk zpk) Validation {
+func mockValidation(zpk zpk) Validation {
 	validationInfo := zpk.info
-	signature := sign(validatorPrivKey, validationInfo[:])
+	signature := Sign(validatorPrivKey, validationInfo[:])
 	return Validation{
-		info:          validationInfo[:],
-		validatorAddr: validatorPubKey,
-		signature:     signature,
+		Info:          validationInfo[:],
+		ValidatorAddr: validatorPubKey,
+		Signature:     signature,
 	}
 }
 
 func compareValidation(val1, val2 Validation, t *testing.T) {
-	if bytes.Compare(val1.info, val2.info) != 0 {
+	if bytes.Compare(val1.Info, val2.Info) != 0 {
 		t.Errorf("Corrupted info")
 	}
-	if bytes.Compare(val1.validatorAddr, val2.validatorAddr) != 0 {
+	if bytes.Compare(val1.ValidatorAddr, val2.ValidatorAddr) != 0 {
 		t.Errorf("Corrupted validator adddress")
 	}
-	if bytes.Compare(val1.signature, val2.signature) != 0 {
-		t.Errorf("Corrupted signature")
+	if bytes.Compare(val1.Signature, val2.Signature) != 0 {
+		t.Errorf("Corrupted Signature")
 	}
 }
 
@@ -228,50 +228,50 @@ func checkPayload(state *State, dataIndex, versionIndex int, zpk zpk, t *testing
 	dataLength, versionLength := dataLength(state, dataIndex)
 	dataHashL, dataHashR := dataHash(state, dataIndex)
 	versionHashL, versionHashR := versionHash(state, dataIndex, versionIndex)
-	initialVersion := state.dataList[dataIndex].versionList[versionIndex]
+	initialVersion := state.DataList[dataIndex].VersionList[versionIndex]
 
-	payload := makePayload(zpk)
-	state.addPayload(payload, dataIndex, versionIndex)
-	data := state.dataList[dataIndex]
-	version := state.dataList[dataIndex].versionList[versionIndex]
+	payload := mockPayload(zpk)
+	state.AddPayload(payload, dataIndex, versionIndex)
+	data := state.DataList[dataIndex]
+	version := state.DataList[dataIndex].VersionList[versionIndex]
 
-	checkLength(state.dataList, dataLength, "Data list", t)
-	checkLength(state.dataList[dataIndex].versionList, versionLength, "Version list", t)
-	checkEmpty(&version.acceptedPayload, "Accepted payload", t)
-	comparePayload(version.payload, payload, t)
-	compareValidation(version.validation, initialVersion.validation, t)
+	checkLength(state.DataList, dataLength, "Data list", t)
+	checkLength(state.DataList[dataIndex].VersionList, versionLength, "Version list", t)
+	checkEmpty(&version.AcceptedPayload, "Accepted payload", t)
+	comparePayload(version.Payload, payload, t)
+	compareValidation(version.Validation, initialVersion.Validation, t)
 	emptyAcceptedPayload := AcceptedPayload{}
-	versionHash := sha256.Sum256(append(append(emptyAcceptedPayload.hash(), payload.hash()...), initialVersion.validation.hash()...))
-	checkHash(version.versionHash, versionHash[:], "Version", t)
-	dataHash := sha256.Sum256(append(append(append(data.description.hash(), versionHashL...), versionHash[:]...), versionHashR...))
-	checkHash(data.dataHash, dataHash[:], "Data", t)
+	versionHash := sha256.Sum256(append(append(emptyAcceptedPayload.Hash(), payload.Hash()...), initialVersion.Validation.Hash()...))
+	checkHash(version.VersionHash, versionHash[:], "Version", t)
+	dataHash := sha256.Sum256(append(append(append(data.Description.Hash(), versionHashL...), versionHash[:]...), versionHashR...))
+	checkHash(data.DataHash, dataHash[:], "Data", t)
 	stateHash := sha256.Sum256(append(append(dataHashL, dataHash[:]...), dataHashR...))
-	checkHash(state.stateHash, stateHash[:], "State", t)
+	checkHash(state.StateHash, stateHash[:], "State", t)
 }
 
-func makePayload(zpk zpk) Payload {
+func mockPayload(zpk zpk) Payload {
 	data := []byte(lorem.Sentence(10, 50))
-	signature := sign(providerPrivKey, append(data, zpk.proof...))
+	signature := Sign(providerPrivKey, append(data, zpk.proof...))
 	return Payload{
-		data:         data,
-		proof:        zpk.proof,
-		providerAddr: providerPubKey,
-		signature:    signature,
+		Data:         data,
+		Proof:        zpk.proof,
+		ProviderAddr: providerPubKey,
+		Signature:    signature,
 	}
 }
 
 func comparePayload(payload1, payload2 Payload, t *testing.T) {
-	if bytes.Compare(payload1.data, payload2.data) != 0 {
+	if bytes.Compare(payload1.Data, payload2.Data) != 0 {
 		t.Errorf("Corrupted data")
 	}
-	if bytes.Compare(payload1.proof, payload2.proof) != 0 {
+	if bytes.Compare(payload1.Proof, payload2.Proof) != 0 {
 		t.Errorf("Corrupted proof")
 	}
-	if bytes.Compare(payload1.providerAddr, payload2.providerAddr) != 0 {
+	if bytes.Compare(payload1.ProviderAddr, payload2.ProviderAddr) != 0 {
 		t.Errorf("Corrupted provider address")
 	}
-	if bytes.Compare(payload1.signature, payload2.signature) != 0 {
-		t.Errorf("Corrupted signature")
+	if bytes.Compare(payload1.Signature, payload2.Signature) != 0 {
+		t.Errorf("Corrupted Signature")
 	}
 }
 
@@ -280,81 +280,81 @@ func comparePayload(payload1, payload2 Payload, t *testing.T) {
 
 func TestAcceptPayload(t *testing.T) {
 	state := mockState(true, true, true)
-	for dataIndex, data := range state.dataList {
-		for versionIndex := range data.versionList {
+	for dataIndex, data := range state.DataList {
+		for versionIndex := range data.VersionList {
 			checkAcceptedPayload(state, dataIndex, versionIndex, t)
 		}
 	}
 }
 
-func checkAcceptedPayload(state *State, dataIndex, versionIndex int, t *testing.T)  {
+func checkAcceptedPayload(state *State, dataIndex, versionIndex int, t *testing.T) {
 	dataLength, versionLength := dataLength(state, dataIndex)
 	dataHashL, dataHashR := dataHash(state, dataIndex)
 	versionHashL, versionHashR := versionHash(state, dataIndex, versionIndex)
-	initialVersion := state.dataList[dataIndex].versionList[versionIndex]
+	initialVersion := state.DataList[dataIndex].VersionList[versionIndex]
 
-	acceptedPayload := makeAcceptedPayload()
-	state.acceptPayload(acceptedPayload, dataIndex, versionIndex)
-	data := state.dataList[dataIndex]
-	version := state.dataList[dataIndex].versionList[versionIndex]
+	acceptedPayload := mockAcceptedPayload()
+	state.AcceptPayload(acceptedPayload, dataIndex, versionIndex)
+	data := state.DataList[dataIndex]
+	version := state.DataList[dataIndex].VersionList[versionIndex]
 
-	checkLength(state.dataList, dataLength, "Data list", t)
-	checkLength(state.dataList[dataIndex].versionList, versionLength, "Version list", t)
-	compareAcceptedPayload(version.acceptedPayload, acceptedPayload, t)
-	comparePayload(version.payload, initialVersion.payload, t)
-	compareValidation(version.validation, initialVersion.validation, t)
-	versionHash := sha256.Sum256(append(append(acceptedPayload.hash(), initialVersion.payload.hash()...), initialVersion.validation.hash()...))
-	checkHash(version.versionHash, versionHash[:], "Version", t)
-	dataHash := sha256.Sum256(append(append(append(data.description.hash(), versionHashL...), versionHash[:]...), versionHashR...))
-	checkHash(data.dataHash, dataHash[:], "Data", t)
+	checkLength(state.DataList, dataLength, "Data list", t)
+	checkLength(state.DataList[dataIndex].VersionList, versionLength, "Version list", t)
+	compareAcceptedPayload(version.AcceptedPayload, acceptedPayload, t)
+	comparePayload(version.Payload, initialVersion.Payload, t)
+	compareValidation(version.Validation, initialVersion.Validation, t)
+	versionHash := sha256.Sum256(append(append(acceptedPayload.Hash(), initialVersion.Payload.Hash()...), initialVersion.Validation.Hash()...))
+	checkHash(version.VersionHash, versionHash[:], "Version", t)
+	dataHash := sha256.Sum256(append(append(append(data.Description.Hash(), versionHashL...), versionHash[:]...), versionHashR...))
+	checkHash(data.DataHash, dataHash[:], "Data", t)
 	stateHash := sha256.Sum256(append(append(dataHashL, dataHash[:]...), dataHashR...))
-	checkHash(state.stateHash, stateHash[:], "State", t)
+	checkHash(state.StateHash, stateHash[:], "State", t)
 }
 
-func makeAcceptedPayload() AcceptedPayload {
+func mockAcceptedPayload() AcceptedPayload {
 	data := []byte(lorem.Sentence(10, 50))
-	signature := sign(acceptorPrivKey, data)
+	signature := Sign(acceptorPrivKey, data)
 	return AcceptedPayload{
-		data:         data,
-		acceptorAddr: acceptorPubKey,
-		signature:    signature,
+		Data:         data,
+		AcceptorAddr: acceptorPubKey,
+		Signature:    signature,
 	}
 }
 
-func compareAcceptedPayload(acceptedPayload1, acceptedPayload2 AcceptedPayload, t *testing.T)  {
-	if bytes.Compare(acceptedPayload1.data, acceptedPayload2.data) != 0 {
+func compareAcceptedPayload(acceptedPayload1, acceptedPayload2 AcceptedPayload, t *testing.T) {
+	if bytes.Compare(acceptedPayload1.Data, acceptedPayload2.Data) != 0 {
 		t.Errorf("Corrupted data")
 	}
-	if bytes.Compare(acceptedPayload1.acceptorAddr, acceptedPayload2.acceptorAddr) != 0 {
-		t.Errorf("Corrupted acceptor address")
+	if bytes.Compare(acceptedPayload1.AcceptorAddr, acceptedPayload2.AcceptorAddr) != 0 {
+		t.Errorf("Corrupted Acceptor address")
 	}
-	if bytes.Compare(acceptedPayload1.signature, acceptedPayload2.signature) != 0 {
-		t.Errorf("Corrupted signature")
+	if bytes.Compare(acceptedPayload1.Signature, acceptedPayload2.Signature) != 0 {
+		t.Errorf("Corrupted Signature")
 	}
 }
 
 // ------------------------------------------------------------------------------------------------------------------- //
 // TESTING UTILITIES
 
-func mockState(mockData, mockValidation, mockPayload bool) *State {
-	if !mockData {
-		mockValidation, mockPayload = false, false
-	} else if !mockValidation {
-		mockPayload = false
+func mockState(data, validation, payload bool) *State {
+	if !data {
+		validation, payload = false, false
+	} else if !validation {
+		payload = false
 	}
 	state := NewState()
 	var versionIndex int
-	if mockData {
+	if data {
 		for zpkIndex, dataIndex := range zpkToData {
-			for len(state.dataList) <= dataIndex {
-				state.addData(makeDescription())
+			for len(state.DataList) <= dataIndex {
+				state.AddData(mockDescription())
 				versionIndex = 0
 			}
-			if mockValidation {
-				state.addValidation(makeValidation(zpks[zpkIndex]), dataIndex)
+			if validation {
+				state.AddValidation(mockValidation(zpks[zpkIndex]), dataIndex)
 			}
-			if mockPayload {
-				state.addPayload(makePayload(zpks[zpkIndex]), dataIndex, versionIndex)
+			if payload {
+				state.AddPayload(mockPayload(zpks[zpkIndex]), dataIndex, versionIndex)
 				versionIndex++
 			}
 		}
@@ -363,42 +363,42 @@ func mockState(mockData, mockValidation, mockPayload bool) *State {
 }
 
 func dataLength(state *State, dataIndex int) (dataListLength, versionListLength int) {
-	dataListLength = len(state.dataList)
-	versionListLength = len(state.dataList[dataIndex].versionList)
+	dataListLength = len(state.DataList)
+	versionListLength = len(state.DataList[dataIndex].VersionList)
 	return
 }
 
 func dataHash(state *State, dataIndex int) (dataHashL, dataHashR []byte) {
-	for i, data := range state.dataList {
+	for i, data := range state.DataList {
 		if i < dataIndex {
-			dataHashL = append(dataHashL, data.dataHash...)
+			dataHashL = append(dataHashL, data.DataHash...)
 		} else if i > dataIndex {
-			dataHashR = append(dataHashR, data.dataHash...)
+			dataHashR = append(dataHashR, data.DataHash...)
 		}
 	}
 	return
 }
 
 func versionHash(state *State, dataIndex, versionIndex int) (versionHashL, versionHashR []byte) {
-	for i, version := range state.dataList[dataIndex].versionList {
+	for i, version := range state.DataList[dataIndex].VersionList {
 		if i < versionIndex {
-			versionHashL = append(versionHashL, version.versionHash...)
+			versionHashL = append(versionHashL, version.VersionHash...)
 		} else if i > versionIndex {
-			versionHashR = append(versionHashR, version.versionHash...)
+			versionHashR = append(versionHashR, version.VersionHash...)
 		}
 	}
 	return
 }
 
-func checkLength(list interface{}, validLength int, descriptor string, t *testing.T)  {
+func checkLength(list interface{}, validLength int, descriptor string, t *testing.T) {
 	length := reflect.ValueOf(list).Len()
 	if length != validLength {
 		t.Errorf(descriptor + ": invalid length")
 	}
 }
 
-func checkEmpty(element empty, descriptor string, t *testing.T) {
-	if !element.isEmpty() {
+func checkEmpty(element Empty, descriptor string, t *testing.T) {
+	if !element.IsEmpty() {
 		t.Errorf(descriptor + " invalid: not empty")
 	}
 }

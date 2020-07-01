@@ -12,31 +12,91 @@ Each new block a new state gets generated
 import (
 	"bytes"
 	"crypto/sha256"
-	"github.com/tendermint/tendermint/config"
-	"github.com/tendermint/tendermint/node"
-	tmdb "github.com/tendermint/tm-db"
 )
 
-type merkleNode interface {
-	hash() []byte
-}
-type empty interface {
-	isEmpty() bool
+type Empty interface {
+	IsEmpty() bool
 }
 
+// ------------------------------------------------------------------------------------------------------------------- //
+// STATE
+
 type State struct {
-	stateHash []byte
-	dataList  []Data
+	StateHash []byte
+	DataList  []Data
 }
-func (state *State) hash() []byte {
+
+func NewState() *State { // called every new block
+	state := &State{}
+	state.Hash()
+	return state
+}
+
+func (state *State) Hash() []byte {
 	var sum []byte
-	for i := range state.dataList {
-		sum = append(sum, state.dataList[i].hash()...)
+	if state == nil {
+		return sum
+	}
+	for i := range state.DataList {
+		sum = append(sum, state.DataList[i].Hash()...)
 	}
 	hash := sha256.Sum256(sum)
-	state.stateHash = hash[:]
-	return state.stateHash
+	state.StateHash = hash[:]
+	return state.StateHash
 }
+
+func (state *State) AddData(description Description) { // called at requireTx
+	id := append(description.ProviderInfo, description.DataInfo...)
+	isSigned := Verify(description.Requirer, id, description.Signature)
+	if isSigned {
+		data := Data{Description: description}
+		state.DataList = append(state.DataList, data)
+		state.Hash()
+	}
+}
+
+func (state *State) AddValidation(validation Validation, dataIndex int) { // called at validateTx
+	isTrusted := false
+	for _, trusted := range state.DataList[dataIndex].Description.TrustedValidators {
+		if bytes.Compare(validation.ValidatorAddr, trusted) == 0 {
+			isTrusted = true
+		}
+	}
+	isSigned := Verify(validation.ValidatorAddr, validation.Info, validation.Signature)
+	if isTrusted && isSigned {
+		version := Version{Validation: validation}
+		state.DataList[dataIndex].VersionList = append(state.DataList[dataIndex].VersionList, version)
+		state.Hash()
+	}
+}
+
+func (state *State) AddPayload(payload Payload, dataIndex int, versionIndex int) { //called at provideTx
+	isProved := false
+	proof := sha256.Sum256(payload.Proof)
+	info := state.DataList[dataIndex].VersionList[versionIndex].Validation.Info
+	if bytes.Compare(proof[:], info) == 0 {
+		isProved = true
+	}
+	isSigned := Verify(payload.ProviderAddr, append(payload.Data, payload.Proof...), payload.Signature)
+	if isProved && isSigned {
+		state.DataList[dataIndex].VersionList[versionIndex].Payload = payload
+		state.Hash()
+	}
+	// TODO: check if a payload already exists
+}
+
+func (state *State) AcceptPayload(acceptedPayload AcceptedPayload, dataIndex int, versionIndex int) { //called at acceptTx
+	isAcceptor := bytes.Compare(acceptedPayload.AcceptorAddr, state.DataList[dataIndex].Description.Acceptor) == 0
+	isSigned := Verify(acceptedPayload.AcceptorAddr, acceptedPayload.Data, acceptedPayload.Signature)
+	if isAcceptor && isSigned {
+		state.DataList[dataIndex].VersionList[versionIndex].AcceptedPayload = acceptedPayload
+		state.Hash()
+	}
+	// TODO: check if payload acceptance already exists
+}
+
+// ------------------------------------------------------------------------------------------------------------------- //
+// DATA
 
 /*
 	Represent data of some type with a single owner
@@ -45,187 +105,139 @@ func (state *State) hash() []byte {
 	Can be hashed by adding hashes of description and every version, and hashing the result
 */
 type Data struct {
-	dataHash    []byte
-	description Description
-	versionList []Version
-}
-func (data *Data) hash() []byte {
-	sum := data.description.hash()
-	for i := range data.versionList {
-		sum = append(sum, data.versionList[i].hash()...)
-	}
-	hash := sha256.Sum256(sum)
-	data.dataHash = hash[:]
-	return data.dataHash
+	DataHash    []byte
+	Description Description
+	VersionList []Version
 }
 
-/*	Describes the type of data with dataInfo and the expected data provider with providerInfo, both generic, anything will be accepted.
-	Defines data owner with requirer, must be a valid secp256k1 public key. The signature must be a valid signature
-	of (description.providerInfo + description.dataInfo) for the given key.
+func (data *Data) Hash() []byte {
+	sum := data.Description.Hash()
+	for i := range data.VersionList {
+		sum = append(sum, data.VersionList[i].Hash()...)
+	}
+	hash := sha256.Sum256(sum)
+	data.DataHash = hash[:]
+	return data.DataHash
+}
+
+// ------------------------------------------------------------------------------------------------------------------- //
+// DESCRIPTION
+
+/*	Describes the type of data with DataInfo and the expected data provider with ProviderInfo, both generic, anything will be accepted.
+	Defines data owner with Requirer, must be a valid secp256k1 public key. The Signature must be a valid Signature
+	of (description.ProviderInfo + description.DataInfo) for the given key.
 	Defines a list of trusted validators, each must be a secp256k1 public key, they are expected to
-	define valid data providers conforming to providerInfo, they could be a government entity, some other trusted entity,
+	define valid data providers conforming to ProviderInfo, they could be a government entity, some other trusted entity,
 	the owner himself or can be left blank if any data from any provider is accepted.
-	Defines an acceptor, must be a secp256k1 public key, he is responsible for manually checking the data and
-	confirming its conformance to the data requested in dataInfo
+	Defines an Acceptor, must be a secp256k1 public key, he is responsible for manually checking the data and
+	confirming its conformance to the data requested in DataInfo
 	Contains only arrays of bytes. Can be hashed by adding hashes of every field and hashing the result. */
 type Description struct {
-	providerInfo      []byte
-	dataInfo          []byte
-	trustedValidators [][]byte
-	acceptor          []byte
-	requirer          []byte
-	signature         []byte
+	ProviderInfo      []byte
+	DataInfo          []byte
+	TrustedValidators [][]byte
+	Acceptor          []byte
+	Requirer          []byte
+	Signature         []byte
 }
-func (description *Description) hash() []byte {
-	sum := append(description.providerInfo, description.dataInfo...)
-	for _, validator := range description.trustedValidators {
+
+func (description *Description) Hash() []byte {
+	sum := append(description.ProviderInfo, description.DataInfo...)
+	for _, validator := range description.TrustedValidators {
 		sum = append(sum, validator...)
 	}
-	sum = append(sum, description.acceptor...)
-	sum = append(sum, description.requirer...)
-	sum = append(sum, description.signature...)
+	sum = append(sum, description.Acceptor...)
+	sum = append(sum, description.Requirer...)
+	sum = append(sum, description.Signature...)
 	hash := sha256.Sum256(sum)
 	return hash[:]
 }
-
 
 /*	A version of data ... */
 type Version struct {
-	versionHash     []byte
-	acceptedPayload AcceptedPayload
-	payload         Payload
-	validation      Validation
-}
-func (version *Version) hash() []byte {
-	sum := append(version.acceptedPayload.hash(), version.payload.hash()...)
-	sum = append(sum, version.validation.hash()...)
-	hash := sha256.Sum256(sum)
-	version.versionHash = hash[:]
-	return version.versionHash
+	VersionHash     []byte
+	AcceptedPayload AcceptedPayload
+	Payload         Payload
+	Validation      Validation
 }
 
-/*	Contains the actual data encrypted with requirer secp256k1 public key. The data is considered provided and verified.
-	The acceptor address must be the secp256k1 public key provided (description.acceptor).
-	The signature must be a valid signature of (acceptedPayload.data) for the given key
+func (version *Version) Hash() []byte {
+	sum := append(version.AcceptedPayload.Hash(), version.Payload.Hash()...)
+	sum = append(sum, version.Validation.Hash()...)
+	hash := sha256.Sum256(sum)
+	version.VersionHash = hash[:]
+	return version.VersionHash
+}
+
+// ------------------------------------------------------------------------------------------------------------------- //
+// ACCEPTED PAYLOAD
+
+/*	Contains the actual data encrypted with Requirer secp256k1 public key. The data is considered provided and verified.
+	The Acceptor address must be the secp256k1 public key provided (description.Acceptor).
+	The Signature must be a valid Signature of (acceptedPayload.data) for the given key
 	Contains only arrays of bytes. Can be hashed by adding hashes of every field and hashing the result.
 	Can be empty / uninitialized. */
 type AcceptedPayload struct {
-	data         []byte // encrypted with requirer, when decrypted by requirer should be encrypted with acceptorAddr to check if it's the same as in payload
-	acceptorAddr []byte // public key representing acceptor address, should be the same as in the description
-	signature    []byte // confirming acceptorAddr
-}
-func (acceptedPayload *AcceptedPayload) hash() []byte {
-	sum := append(acceptedPayload.data, acceptedPayload.acceptorAddr...)
-	sum = append(sum, acceptedPayload.signature...)
-	hash :=  sha256.Sum256(sum)
-	return hash[:]
-}
-func (acceptedPayload *AcceptedPayload) isEmpty() bool {
-	return acceptedPayload.data == nil && acceptedPayload.acceptorAddr == nil && acceptedPayload.signature == nil
+	Data         []byte // encrypted with Requirer, when decrypted by Requirer should be encrypted with acceptorAddr to check if it's the same as in payload
+	AcceptorAddr []byte // public key representing Acceptor address, should be the same as in the description
+	Signature    []byte // confirming acceptorAddr
 }
 
-/*	Contains the actual data encrypted with acceptor secp256k1 public key. The data is considered provided, but not verified.
+func (acceptedPayload *AcceptedPayload) Hash() []byte {
+	sum := append(acceptedPayload.Data, acceptedPayload.AcceptorAddr...)
+	sum = append(sum, acceptedPayload.Signature...)
+	hash := sha256.Sum256(sum)
+	return hash[:]
+}
+func (acceptedPayload *AcceptedPayload) IsEmpty() bool {
+	return acceptedPayload.Data == nil && acceptedPayload.AcceptorAddr == nil && acceptedPayload.Signature == nil
+}
+
+// ------------------------------------------------------------------------------------------------------------------- //
+// PAYLOAD
+
+/*	Contains the actual data encrypted with Acceptor secp256k1 public key. The data is considered provided, but not verified.
 	The zero knowledge proof must be an arbitrary info or seed known to both validator and provider hashed n-1 times,
 	if (hash(payload.proof) != validation.info) then the payload wont be accepted!
 	The provider address can be any secp256k1 public key.
-	The signature must be a valid signature of (payload.data + payload.proof) for the given key.
+	The Signature must be a valid Signature of (payload.data + payload.proof) for the given key.
 	Contains only arrays of bytes. Can be hashed by adding hashes of every field and hashing the result.
 	Can be empty / uninitialized. */
 type Payload struct {
-	data         []byte
-	proof        []byte
-	providerAddr []byte
-	signature    []byte
+	Data         []byte
+	Proof        []byte
+	ProviderAddr []byte
+	Signature    []byte
 }
-func (payload *Payload) hash() []byte {
-	sum := append(payload.data, payload.proof...)
-	sum = append(sum, payload.providerAddr...)
-	sum = append(sum, payload.signature...)
+
+func (payload *Payload) Hash() []byte {
+	sum := append(payload.Data, payload.Proof...)
+	sum = append(sum, payload.ProviderAddr...)
+	sum = append(sum, payload.Signature...)
 	hash := sha256.Sum256(sum)
 	return hash[:]
 }
-func (payload *Payload) isEmpty() bool {
-	return payload.data == nil && payload.proof == nil && payload.providerAddr == nil && payload.signature == nil
+func (payload *Payload) IsEmpty() bool {
+	return payload.Data == nil && payload.Proof == nil && payload.ProviderAddr == nil && payload.Signature == nil
 }
+
+// ------------------------------------------------------------------------------------------------------------------- //
+// VALIDATION
 
 /*	An arbitrary info or seed known to both validator and provider hashed n times, could be an official ID number,
 	is needed for zero knowledge proof of validation identity.
-	The validator address must be one of secp256k1 public keys provided in (description.trustedValidators).
-	The signature must be a valid signature of (validation.info) for the given key.
+	The validator address must be one of secp256k1 public keys provided in (description.TrustedValidators).
+	The Signature must be a valid Signature of (validation.info) for the given key.
 	Contains only arrays of bytes. Can be hashed by adding hashes of every field and hashing the result. */
 type Validation struct {
-	info          []byte
-	validatorAddr []byte
-	signature     []byte
+	Info          []byte
+	ValidatorAddr []byte
+	Signature     []byte
 }
-func (validation *Validation) hash() []byte {
-	sum := append(validation.info, validation.validatorAddr...)
-	sum = append(sum, validation.signature...)
+
+func (validation *Validation) Hash() []byte {
+	sum := append(validation.Info, validation.ValidatorAddr...)
+	sum = append(sum, validation.Signature...)
 	hash := sha256.Sum256(sum)
 	return hash[:]
-}
-
-func NewState() *State { // called every new block
-	state := &State{}
-	state.hash()
-	return state
-}
-
-func (state *State) addData(description Description) { // called at requireTx
-	id := append(description.providerInfo, description.dataInfo...)
-	isSigned := verify(description.requirer, id, description.signature)
-	if isSigned {
-		data := Data{description: description}
-		state.dataList = append(state.dataList, data)
-		state.hash()
-	}
-}
-
-func (state *State) addValidation(validation Validation, dataIndex int) { // called at validateTx
-	isTrusted := false
-	for _, trusted := range state.dataList[dataIndex].description.trustedValidators {
-		if bytes.Compare(validation.validatorAddr, trusted) == 0 {
-			isTrusted = true
-		}
-	}
-	isSigned := verify(validation.validatorAddr, validation.info, validation.signature)
-	if isTrusted && isSigned {
-		version := Version{validation: validation}
-		state.dataList[dataIndex].versionList = append(state.dataList[dataIndex].versionList, version)
-		state.hash()
-	}
-}
-
-func (state *State) addPayload(payload Payload, dataIndex int, versionIndex int) { //called at provideTx
-	// TODO: check if a payload already exists
-	isProved := false
-	proof := sha256.Sum256(payload.proof)
-	info := state.dataList[dataIndex].versionList[versionIndex].validation.info
-	if bytes.Compare(proof[:], info) == 0 {isProved = true}
-	isSigned := verify(payload.providerAddr, append(payload.data, payload.proof...), payload.signature)
-	if isProved && isSigned {
-		state.dataList[dataIndex].versionList[versionIndex].payload = payload
-		state.hash()
-	}
-}
-
-func (state *State) acceptPayload(acceptedPayload AcceptedPayload, dataIndex int, versionIndex int) { //called at acceptTx
-	// TODO: check if payload acceptance already exists
-	isAcceptor := bytes.Compare(acceptedPayload.acceptorAddr, state.dataList[dataIndex].description.acceptor) == 0
-	isSigned := verify(acceptedPayload.acceptorAddr, acceptedPayload.data, acceptedPayload.signature)
-	if isAcceptor && isSigned {
-		state.dataList[dataIndex].versionList[versionIndex].acceptedPayload = acceptedPayload
-		state.hash()
-	}
-}
-
-
-
-func NewPersistentData(config *config.Config) tmdb.DB {
-	database, _ := node.DefaultDBProvider(
-		&node.DBContext{
-			ID:     "dbc-node",
-			Config: config,
-		})
-	return database
 }

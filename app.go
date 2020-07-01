@@ -7,126 +7,148 @@ import (
 )
 
 type dataBlockChain struct {
-	height      int64
-	hash        []byte
-	data        map[string]string
-	uncommitted map[string]string
+	height    int64
+	confirmed []*State // written at 2nd commit
+	committed *State   // written at 1st commit
+	new       *State   // written at deliverTx
 }
 
 var _ tendermint.Application = (*dataBlockChain)(nil)
 
 func NewDataBlockChain() *dataBlockChain {
+	state := NewState()
 	return &dataBlockChain{
-		height:      0,
-		hash:        []byte{},
-		data:        map[string]string{},
-		uncommitted: map[string]string{},
+		height: 0,
+		new:    state,
 	}
 }
 
-func (dbc *dataBlockChain) Info(info tendermint.RequestInfo) tendermint.ResponseInfo {
+func (dbc *dataBlockChain) stateAtHeight(height int) *State {
+	switch height {
+	case 0: // return state at current height: last confirmed state
+		return dbc.confirmed[len(dbc.confirmed)-1]
+	case 1: // at height 1 there's no confirmed state
+		return nil
+	default: // confirmed states start at height 2
+		return dbc.confirmed[height-2]
+	}
+}
+
+func (dbc *dataBlockChain) Info(requestInfo tendermint.RequestInfo) tendermint.ResponseInfo {
 	responseInfo := tendermint.ResponseInfo{
 		Data:             "Some arbitrary information about dbc-node app",
 		Version:          "V1",
 		AppVersion:       1,
 		LastBlockHeight:  dbc.height,
-		LastBlockAppHash: dbc.hash,
+		LastBlockAppHash: dbc.committed.Hash(),
 	}
 	return responseInfo
 }
 
-func (dbc *dataBlockChain) SetOption(option tendermint.RequestSetOption) tendermint.ResponseSetOption {
+func (dbc *dataBlockChain) SetOption(requestSetOption tendermint.RequestSetOption) tendermint.ResponseSetOption {
 	responseSetOption := tendermint.ResponseSetOption{
-		Code:                 0,
-		Log:                  "",
-		Info:                 "",
+		Code: 0,
+		Log:  "",
+		Info: "",
 	}
 	return responseSetOption
 }
 
-func (dbc *dataBlockChain) Query(query tendermint.RequestQuery) tendermint.ResponseQuery {
-	question := string(query.Data)
-	answer := dbc.data[question]
-	code := uint32(0)
-	if answer == "" {
-		code = 1
+func (dbc *dataBlockChain) Query(requestQuery tendermint.RequestQuery) tendermint.ResponseQuery {
+	var query Query
+	_ = json.Unmarshal(requestQuery.Data, &query)
+	var value []byte
+	state := dbc.stateAtHeight(int(requestQuery.Height))
+	switch query.QrType {
+	case QueryData:
+		value, _ = json.Marshal(state.DataList[query.DataIndex].Description)
+	case QueryValidation:
+		value, _ = json.Marshal(state.DataList[query.DataIndex].VersionList[query.VersionIndex].Validation)
+	case QueryPayload:
+		value, _ = json.Marshal(state.DataList[query.DataIndex].VersionList[query.VersionIndex].Payload)
+	case QueryAcceptedPayload:
+		value, _ = json.Marshal(state.DataList[query.DataIndex].VersionList[query.VersionIndex].AcceptedPayload)
 	}
-	// TODO: form a correct response, for now it's just the code, question an answer
 	responseQuery := tendermint.ResponseQuery{
-		Code:                 code,
-		Log:                  "",
-		Info:                 "",
-		Index:                0,
-		Key:                  []byte(question),
-		Value:                []byte(answer),
-		Proof:                nil,
-		Height:               0,
-		Codespace:            "",
+		Code:      uint32(0),
+		Log:       "",
+		Info:      "",
+		Index:     -1,
+		Key:       requestQuery.Data,
+		Value:     value,
+		Proof:     nil,
+		Height:    0,
+		Codespace: "",
 	}
 	return responseQuery
 }
 
-func (dbc *dataBlockChain) CheckTx(tx tendermint.RequestCheckTx) tendermint.ResponseCheckTx {
-	transaction := tx.Tx
+func (dbc *dataBlockChain) CheckTx(requestCheckTx tendermint.RequestCheckTx) tendermint.ResponseCheckTx {
+	transaction := requestCheckTx.Tx
 	containsEqualSign := bytes.ContainsAny(transaction, "=")
 	code := uint32(0)
 	if !containsEqualSign {
 		code = 1
 	}
 	responseCheckTx := tendermint.ResponseCheckTx{
-		Code:                 code,
-		Data:                 nil,
-		Log:                  "",
-		Info:                 "",
-		GasWanted:            0,
-		GasUsed:              0,
-		Events:               nil,
-		Codespace:            "",
+		Code:      code,
+		Data:      nil,
+		Log:       "",
+		Info:      "",
+		GasWanted: 0,
+		GasUsed:   0,
+		Events:    nil,
+		Codespace: "",
 	}
 	return responseCheckTx
 }
 
-func (dbc *dataBlockChain) InitChain(chain tendermint.RequestInitChain) tendermint.ResponseInitChain {
+func (dbc *dataBlockChain) InitChain(requestInitChain tendermint.RequestInitChain) tendermint.ResponseInitChain {
 	responseInitChain := tendermint.ResponseInitChain{
-		ConsensusParams:      nil,
-		Validators:           nil,
+		ConsensusParams: nil,
+		Validators:      nil,
 	}
 	return responseInitChain
 }
 
-func (dbc *dataBlockChain) BeginBlock(block tendermint.RequestBeginBlock) tendermint.ResponseBeginBlock {
+func (dbc *dataBlockChain) BeginBlock(requestBeginBlock tendermint.RequestBeginBlock) tendermint.ResponseBeginBlock {
 	responseBeginBlock := tendermint.ResponseBeginBlock{
-		Events:               nil,
+		Events: nil,
 	}
 	return responseBeginBlock
 }
 
-func (dbc *dataBlockChain) DeliverTx(tx tendermint.RequestDeliverTx) tendermint.ResponseDeliverTx {
-	transaction := tx.Tx
-	containsEqualSign := bytes.ContainsAny(transaction, "=")
-	code := uint32(0)
-	if containsEqualSign {
-		parts := bytes.SplitN(transaction, []byte("="), 2)
-		question := string(parts[0])
-		answer := string(parts[1])
-		dbc.uncommitted[question] = answer
-	} else {
-		code = 1
+func (dbc *dataBlockChain) DeliverTx(requestDeliverTx tendermint.RequestDeliverTx) tendermint.ResponseDeliverTx {
+	var transaction Transaction
+	_ = json.Unmarshal(requestDeliverTx.Tx, &transaction)
+	switch transaction.TxType {
+	case TxAddData:
+		description := *transaction.Description
+		dbc.new.AddData(description)
+	case TxAddValidation:
+		validation := *transaction.Validation
+		dbc.new.AddValidation(validation, transaction.DataIndex)
+	case TxAddPayload:
+		payload := *transaction.Payload
+		dbc.new.AddPayload(payload, transaction.DataIndex, transaction.VersionIndex)
+	case TxAcceptPayload:
+		acceptedPayload := *transaction.AcceptedPayload
+		dbc.new.AcceptPayload(acceptedPayload, transaction.DataIndex, transaction.VersionIndex)
 	}
 	responseDeliverTx := tendermint.ResponseDeliverTx{
-		Code:                 code,
-		Data:                 nil,
-		Log:                  "",
-		Info:                 "",
-		GasWanted:            0,
-		GasUsed:              0,
-		Events:               nil,
-		Codespace:            "",
+		Code:      uint32(0),
+		Data:      nil,
+		Log:       "",
+		Info:      "",
+		GasWanted: 0,
+		GasUsed:   0,
+		Events:    nil,
+		Codespace: "",
 	}
 	return responseDeliverTx
 }
 
-func (dbc *dataBlockChain) EndBlock(block tendermint.RequestEndBlock) tendermint.ResponseEndBlock {
+func (dbc *dataBlockChain) EndBlock(requestEndBlock tendermint.RequestEndBlock) tendermint.ResponseEndBlock {
 	responseEndBlock := tendermint.ResponseEndBlock{
 		ValidatorUpdates:      nil,
 		ConsensusParamUpdates: nil,
@@ -136,15 +158,12 @@ func (dbc *dataBlockChain) EndBlock(block tendermint.RequestEndBlock) tendermint
 }
 
 func (dbc *dataBlockChain) Commit() tendermint.ResponseCommit {
-	for question, answer := range dbc.uncommitted {
-		dbc.data[question] += answer + ";"
-	}
-	dbc.uncommitted = map[string]string{}
-	hash, _ := json.Marshal(dbc.data)
-	dbc.hash = hash
+	dbc.confirmed = append(dbc.confirmed, dbc.committed)
+	dbc.committed = dbc.new
+	dbc.new = NewState()
 	dbc.height++
 	responseCommit := tendermint.ResponseCommit{
-		Data:         dbc.hash,
+		Data:         dbc.committed.Hash(),
 		RetainHeight: 0,
 	}
 	return responseCommit
