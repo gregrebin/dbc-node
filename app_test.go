@@ -14,6 +14,10 @@ func TestApp(t *testing.T) {
 	if len(dbc.new.DataList) != 1 {
 		t.Errorf("Transaction not added")
 	}
+	_ = dbc.Commit()
+	if len(dbc.new.DataList) != 1 {
+		t.Errorf("Transaction not retained")
+	}
 	// TODO: need more test
 }
 

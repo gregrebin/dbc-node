@@ -17,7 +17,7 @@ type dataBlockChain struct {
 var _ tendermint.Application = (*dataBlockChain)(nil)
 
 func NewDataBlockChain() *dataBlockChain {
-	state := NewState()
+	state := NewState(&State{})
 	return &dataBlockChain{
 		height: 0,
 		new:    state,
@@ -157,10 +157,9 @@ func (dbc *dataBlockChain) EndBlock(requestEndBlock tendermint.RequestEndBlock) 
 }
 
 func (dbc *dataBlockChain) Commit() tendermint.ResponseCommit {
-	// TODO: retain old data in new block
 	dbc.confirmed = append(dbc.confirmed, dbc.committed)
 	dbc.committed = dbc.new
-	dbc.new = NewState()
+	dbc.new = NewState(dbc.committed)
 	dbc.height++
 	responseCommit := tendermint.ResponseCommit{
 		Data:         dbc.committed.Hash(),

@@ -72,12 +72,10 @@ func initZpk() {
 // EMPTY STATE
 
 func TestEmptyState(t *testing.T) {
-	state := NewState()
+	state := NewState(&State{})
 	checkNil(state.DataList, "Data list", t)
 	validHash := sha256.Sum256(nil)
-	checkHash(state.StateHash, validHash[:], "Empty state", t)
-	checkHash(state.Hash(), validHash[:], "Hash function return", t)
-	checkHash(state.StateHash, validHash[:], "Empty state after hash function", t)
+	checkHash(state.Hash(), validHash[:], "State hash", t)
 
 }
 
@@ -105,7 +103,7 @@ func checkValidData(state *State, t *testing.T) {
 	dataHash := sha256.Sum256(description.Hash())
 	checkHash(data.Hash(), dataHash[:], "Data", t)
 	stateHash := sha256.Sum256(append(otherDataHash, dataHash[:]...))
-	checkHash(state.StateHash, stateHash[:], "State", t)
+	checkHash(state.Hash(), stateHash[:], "State", t)
 }
 
 func mockDescription() *Description {
@@ -180,7 +178,7 @@ func checkValidation(state *State, dataIndex int, zpk zpk, t *testing.T) {
 	dataHash := sha256.Sum256(append(append(data.Description.Hash(), otherVersionHash...), versionHash[:]...))
 	checkHash(data.Hash(), dataHash[:], "Data", t)
 	stateHash := sha256.Sum256(append(append(dataHashL, dataHash[:]...), dataHashR...))
-	checkHash(state.StateHash, stateHash[:], "State", t)
+	checkHash(state.Hash(), stateHash[:], "State", t)
 }
 
 func mockValidation(zpk zpk) *Validation {
@@ -245,7 +243,7 @@ func checkPayload(state *State, dataIndex, versionIndex int, zpk zpk, t *testing
 	dataHash := sha256.Sum256(append(append(append(data.Description.Hash(), versionHashL...), versionHash[:]...), versionHashR...))
 	checkHash(data.Hash(), dataHash[:], "Data", t)
 	stateHash := sha256.Sum256(append(append(dataHashL, dataHash[:]...), dataHashR...))
-	checkHash(state.StateHash, stateHash[:], "State", t)
+	checkHash(state.Hash(), stateHash[:], "State", t)
 }
 
 func mockPayload(zpk zpk) *Payload {
@@ -308,7 +306,7 @@ func checkAcceptedPayload(state *State, dataIndex, versionIndex int, t *testing.
 	dataHash := sha256.Sum256(append(append(append(data.Description.Hash(), versionHashL...), versionHash[:]...), versionHashR...))
 	checkHash(data.Hash(), dataHash[:], "Data", t)
 	stateHash := sha256.Sum256(append(append(dataHashL, dataHash[:]...), dataHashR...))
-	checkHash(state.StateHash, stateHash[:], "State", t)
+	checkHash(state.Hash(), stateHash[:], "State", t)
 }
 
 func mockAcceptedPayload() *AcceptedPayload {
@@ -343,7 +341,7 @@ func mockState(data, validation, payload bool) *State {
 	} else if !validation {
 		payload = false
 	}
-	state := NewState()
+	state := NewState(&State{})
 	var versionIndex int
 	if data {
 		for zpkIndex, dataIndex := range zpkToData {

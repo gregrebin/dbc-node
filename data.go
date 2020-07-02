@@ -24,13 +24,25 @@ type Empty interface {
 // STATE
 
 type State struct {
-	StateHash []byte
-	DataList  []Data
+	DataList []Data
 }
 
-func NewState() *State { // called every new block
+func NewState(oldState *State) *State { // called every new block
 	state := &State{}
-	state.Hash()
+	for _, oldData := range oldState.DataList {
+		data := Data{
+			Description: oldData.Description,
+		}
+		for _, oldVersion := range oldData.VersionList {
+			version := Version{
+				AcceptedPayload: oldVersion.AcceptedPayload,
+				Payload:         oldVersion.Payload,
+				Validation:      oldVersion.Validation,
+			}
+			data.VersionList = append(data.VersionList, version)
+		}
+		state.DataList = append(state.DataList, data)
+	}
 	return state
 }
 
@@ -43,8 +55,7 @@ func (state *State) Hash() []byte {
 		sum = append(sum, state.DataList[i].Hash()...)
 	}
 	hash := sha256.Sum256(sum)
-	state.StateHash = hash[:]
-	return state.StateHash
+	return hash[:]
 }
 func (state *State) AddData(description *Description) { // called at requireTx
 	id := append(description.ProviderInfo, description.DataInfo...)
