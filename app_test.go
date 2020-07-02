@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"github.com/tendermint/tendermint/abci/types"
 	"testing"
@@ -13,7 +14,7 @@ func TestApp(t *testing.T) {
 	if len(dbc.new.DataList) != 1 {
 		t.Errorf("Transaction not added")
 	}
-	// TODO: need more test!!!
+	// TODO: need more test
 }
 
 func mockRequestInfo() types.RequestInfo {
@@ -33,7 +34,9 @@ func mockRequestDeliverTx() types.RequestDeliverTx {
 		VersionIndex: 0,
 	}
 	tx, _ := json.Marshal(transaction)
+	encodedTx := make([]byte, base64.StdEncoding.EncodedLen(len(tx)))
+	base64.StdEncoding.Encode(encodedTx, tx)
 	return types.RequestDeliverTx{
-		Tx: tx,
+		Tx: encodedTx,
 	}
 }

@@ -1,7 +1,10 @@
 package main
 
 import (
+	"bytes"
+	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	tendermint "github.com/tendermint/tendermint/abci/types"
 )
 
@@ -112,11 +115,17 @@ func (dbc *dataBlockChain) BeginBlock(requestBeginBlock tendermint.RequestBeginB
 }
 
 func (dbc *dataBlockChain) DeliverTx(requestDeliverTx tendermint.RequestDeliverTx) tendermint.ResponseDeliverTx {
+	// TODO: try NewDecoder
+	tx := make([]byte, base64.StdEncoding.DecodedLen(len(requestDeliverTx.Tx)))
+	_, _ = base64.StdEncoding.Decode(tx, requestDeliverTx.Tx)
+	tx = bytes.Trim(tx, "\x00")
 	var transaction Transaction
-	_ = json.Unmarshal(requestDeliverTx.Tx, &transaction)
+	_ = json.Unmarshal(tx, &transaction)
 	switch transaction.TxType {
 	case TxAddData:
+		fmt.Println("Yes, I do recognize that its an add data transaction")
 		description := *transaction.Description
+		fmt.Println("description:", description)
 		dbc.new.AddData(description)
 	case TxAddValidation:
 		validation := *transaction.Validation
@@ -151,6 +160,7 @@ func (dbc *dataBlockChain) EndBlock(requestEndBlock tendermint.RequestEndBlock) 
 }
 
 func (dbc *dataBlockChain) Commit() tendermint.ResponseCommit {
+	// TODO: retain old data in new block
 	dbc.confirmed = append(dbc.confirmed, dbc.committed)
 	dbc.committed = dbc.new
 	dbc.new = NewState()
