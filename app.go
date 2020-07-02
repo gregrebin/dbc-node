@@ -122,16 +122,16 @@ func (dbc *dataBlockChain) DeliverTx(requestDeliverTx tendermint.RequestDeliverT
 	_ = json.Unmarshal(tx, &transaction)
 	switch transaction.TxType {
 	case TxAddData:
-		description := *transaction.Description
+		description := transaction.Description
 		dbc.new.AddData(description)
 	case TxAddValidation:
-		validation := *transaction.Validation
+		validation := transaction.Validation
 		dbc.new.AddValidation(validation, transaction.DataIndex)
 	case TxAddPayload:
-		payload := *transaction.Payload
+		payload := transaction.Payload
 		dbc.new.AddPayload(payload, transaction.DataIndex, transaction.VersionIndex)
 	case TxAcceptPayload:
-		acceptedPayload := *transaction.AcceptedPayload
+		acceptedPayload := transaction.AcceptedPayload
 		dbc.new.AcceptPayload(acceptedPayload, transaction.DataIndex, transaction.VersionIndex)
 	}
 	responseDeliverTx := tendermint.ResponseDeliverTx{

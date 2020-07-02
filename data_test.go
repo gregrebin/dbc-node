@@ -108,7 +108,7 @@ func checkValidData(state *State, t *testing.T) {
 	checkHash(state.StateHash, stateHash[:], "State", t)
 }
 
-func mockDescription() Description {
+func mockDescription() *Description {
 	providerInfo := []byte(lorem.Sentence(10, 20))
 	dataInfo := []byte(lorem.Sentence(10, 20))
 	signature := Sign(requirerPrivKey, append(providerInfo, dataInfo...))
@@ -120,10 +120,10 @@ func mockDescription() Description {
 		Requirer:          requirerPubKey,
 		Signature:         signature,
 	}
-	return description
+	return &description
 }
 
-func compareDescription(desc1, desc2 Description, t *testing.T) {
+func compareDescription(desc1, desc2 *Description, t *testing.T) {
 	if bytes.Compare(desc1.ProviderInfo, desc2.ProviderInfo) != 0 {
 		t.Errorf("Corrupted provider info")
 	}
@@ -170,8 +170,8 @@ func checkValidation(state *State, dataIndex int, zpk zpk, t *testing.T) {
 
 	checkLength(state.DataList, dataLength, "Data list", t)
 	checkLength(state.DataList[dataIndex].VersionList, versionLength+1, "Version list", t)
-	checkEmpty(&version.AcceptedPayload, "Accepted payload", t)
-	checkEmpty(&version.Payload, "Payload", t)
+	checkEmpty(version.AcceptedPayload, "Accepted payload", t)
+	checkEmpty(version.Payload, "Payload", t)
 	compareValidation(version.Validation, validation, t)
 	emptyAcceptedPayload := AcceptedPayload{}
 	emptyPayload := Payload{}
@@ -183,17 +183,18 @@ func checkValidation(state *State, dataIndex int, zpk zpk, t *testing.T) {
 	checkHash(state.StateHash, stateHash[:], "State", t)
 }
 
-func mockValidation(zpk zpk) Validation {
+func mockValidation(zpk zpk) *Validation {
 	validationInfo := zpk.info
 	signature := Sign(validatorPrivKey, validationInfo[:])
-	return Validation{
+	validation := Validation{
 		Info:          validationInfo[:],
 		ValidatorAddr: validatorPubKey,
 		Signature:     signature,
 	}
+	return &validation
 }
 
-func compareValidation(val1, val2 Validation, t *testing.T) {
+func compareValidation(val1, val2 *Validation, t *testing.T) {
 	if bytes.Compare(val1.Info, val2.Info) != 0 {
 		t.Errorf("Corrupted info")
 	}
@@ -235,7 +236,7 @@ func checkPayload(state *State, dataIndex, versionIndex int, zpk zpk, t *testing
 
 	checkLength(state.DataList, dataLength, "Data list", t)
 	checkLength(state.DataList[dataIndex].VersionList, versionLength, "Version list", t)
-	checkEmpty(&version.AcceptedPayload, "Accepted payload", t)
+	checkEmpty(version.AcceptedPayload, "Accepted payload", t)
 	comparePayload(version.Payload, payload, t)
 	compareValidation(version.Validation, initialVersion.Validation, t)
 	emptyAcceptedPayload := AcceptedPayload{}
@@ -247,18 +248,19 @@ func checkPayload(state *State, dataIndex, versionIndex int, zpk zpk, t *testing
 	checkHash(state.StateHash, stateHash[:], "State", t)
 }
 
-func mockPayload(zpk zpk) Payload {
+func mockPayload(zpk zpk) *Payload {
 	data := []byte(lorem.Sentence(10, 50))
 	signature := Sign(providerPrivKey, append(data, zpk.proof...))
-	return Payload{
+	payload := Payload{
 		Data:         data,
 		Proof:        zpk.proof,
 		ProviderAddr: providerPubKey,
 		Signature:    signature,
 	}
+	return &payload
 }
 
-func comparePayload(payload1, payload2 Payload, t *testing.T) {
+func comparePayload(payload1, payload2 *Payload, t *testing.T) {
 	if bytes.Compare(payload1.Data, payload2.Data) != 0 {
 		t.Errorf("Corrupted data")
 	}
@@ -309,17 +311,18 @@ func checkAcceptedPayload(state *State, dataIndex, versionIndex int, t *testing.
 	checkHash(state.StateHash, stateHash[:], "State", t)
 }
 
-func mockAcceptedPayload() AcceptedPayload {
+func mockAcceptedPayload() *AcceptedPayload {
 	data := []byte(lorem.Sentence(10, 50))
 	signature := Sign(acceptorPrivKey, data)
-	return AcceptedPayload{
+	acceptedPayload := AcceptedPayload{
 		Data:         data,
 		AcceptorAddr: acceptorPubKey,
 		Signature:    signature,
 	}
+	return &acceptedPayload
 }
 
-func compareAcceptedPayload(acceptedPayload1, acceptedPayload2 AcceptedPayload, t *testing.T) {
+func compareAcceptedPayload(acceptedPayload1, acceptedPayload2 *AcceptedPayload, t *testing.T) {
 	if bytes.Compare(acceptedPayload1.Data, acceptedPayload2.Data) != 0 {
 		t.Errorf("Corrupted data")
 	}

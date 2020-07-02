@@ -29,7 +29,7 @@ func mockRequestDeliverTx() types.RequestDeliverTx {
 	description := mockDescription()
 	transaction := Transaction{
 		TxType:       TxAddData,
-		Description:  &description,
+		Description:  description,
 		DataIndex:    0,
 		VersionIndex: 0,
 	}

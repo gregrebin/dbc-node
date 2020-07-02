@@ -14,6 +14,8 @@ import (
 	"crypto/sha256"
 )
 
+// TODO: hash methods should not panic with nil receivers
+
 type Empty interface {
 	IsEmpty() bool
 }
@@ -44,7 +46,7 @@ func (state *State) Hash() []byte {
 	state.StateHash = hash[:]
 	return state.StateHash
 }
-func (state *State) AddData(description Description) { // called at requireTx
+func (state *State) AddData(description *Description) { // called at requireTx
 	id := append(description.ProviderInfo, description.DataInfo...)
 	isSigned := Verify(description.Requirer, id, description.Signature)
 	if isSigned {
@@ -53,7 +55,7 @@ func (state *State) AddData(description Description) { // called at requireTx
 		state.Hash()
 	}
 }
-func (state *State) AddValidation(validation Validation, dataIndex int) { // called at validateTx
+func (state *State) AddValidation(validation *Validation, dataIndex int) { // called at validateTx
 	isTrusted := false
 	for _, trusted := range state.DataList[dataIndex].Description.TrustedValidators {
 		if bytes.Compare(validation.ValidatorAddr, trusted) == 0 {
@@ -62,12 +64,12 @@ func (state *State) AddValidation(validation Validation, dataIndex int) { // cal
 	}
 	isSigned := Verify(validation.ValidatorAddr, validation.Info, validation.Signature)
 	if isTrusted && isSigned {
-		version := Version{Validation: validation}
+		version := Version{Validation: validation, Payload: &Payload{}, AcceptedPayload: &AcceptedPayload{}}
 		state.DataList[dataIndex].VersionList = append(state.DataList[dataIndex].VersionList, version)
 		state.Hash()
 	}
 }
-func (state *State) AddPayload(payload Payload, dataIndex int, versionIndex int) { //called at provideTx
+func (state *State) AddPayload(payload *Payload, dataIndex int, versionIndex int) { //called at provideTx
 	isProved := false
 	proof := sha256.Sum256(payload.Proof)
 	info := state.DataList[dataIndex].VersionList[versionIndex].Validation.Info
@@ -81,7 +83,7 @@ func (state *State) AddPayload(payload Payload, dataIndex int, versionIndex int)
 	}
 	// TODO: check if a payload already exists
 }
-func (state *State) AcceptPayload(acceptedPayload AcceptedPayload, dataIndex int, versionIndex int) { //called at acceptTx
+func (state *State) AcceptPayload(acceptedPayload *AcceptedPayload, dataIndex int, versionIndex int) { //called at acceptTx
 	isAcceptor := bytes.Compare(acceptedPayload.AcceptorAddr, state.DataList[dataIndex].Description.Acceptor) == 0
 	isSigned := Verify(acceptedPayload.AcceptorAddr, acceptedPayload.Data, acceptedPayload.Signature)
 	if isAcceptor && isSigned {
@@ -101,7 +103,7 @@ func (state *State) AcceptPayload(acceptedPayload AcceptedPayload, dataIndex int
 	Can be hashed by adding hashes of description and every version, and hashing the result
 */
 type Data struct {
-	Description Description
+	Description *Description
 	VersionList []Version
 }
 
@@ -152,9 +154,9 @@ func (description *Description) Hash() []byte {
 
 /*	A version of data ... */
 type Version struct {
-	AcceptedPayload AcceptedPayload
-	Payload         Payload
-	Validation      Validation
+	AcceptedPayload *AcceptedPayload
+	Payload         *Payload
+	Validation      *Validation
 }
 
 func (version *Version) Hash() []byte {
