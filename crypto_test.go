@@ -32,7 +32,7 @@ func TestSignature(t *testing.T) {
 	signed := Verify(pubKey, message, signature)
 	if !signed {
 		t.Fail()
-	} // TODO: check some wrong Signature
+	}
 }
 
 func TestOpenSslSignature(t *testing.T) {
@@ -41,7 +41,7 @@ func TestOpenSslSignature(t *testing.T) {
 	signed := Verify(pubKey, message, signature)
 	if !signed {
 		t.Fail()
-	} // TODO: check some wrong Signature
+	}
 }
 
 func TestEncryption(t *testing.T) {
@@ -51,5 +51,5 @@ func TestEncryption(t *testing.T) {
 	difference := bytes.Compare(message, decrypted)
 	if difference != 0 {
 		t.Fail()
-	} // TODO: check some wrong encryption
+	}
 }

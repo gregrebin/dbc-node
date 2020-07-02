@@ -156,8 +156,6 @@ func TestAddValidation(t *testing.T) {
 	checkValidation(state, 2, zpks[3], t)
 	checkValidation(state, 2, zpks[4], t)
 	checkValidation(state, 2, zpks[5], t)
-
-	// TODO: check invalid validation (wrong Signature, etc.)
 }
 
 func checkValidation(state *State, dataIndex int, zpk zpk, t *testing.T) {

@@ -13,6 +13,7 @@ func TestApp(t *testing.T) {
 	if len(dbc.new.DataList) != 1 {
 		t.Errorf("Transaction not added")
 	}
+	// TODO: need more test!!!
 }
 
 func mockRequestInfo() types.RequestInfo {
