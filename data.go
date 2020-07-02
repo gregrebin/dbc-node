@@ -101,7 +101,6 @@ func (state *State) AcceptPayload(acceptedPayload AcceptedPayload, dataIndex int
 	Can be hashed by adding hashes of description and every version, and hashing the result
 */
 type Data struct {
-	DataHash    []byte
 	Description Description
 	VersionList []Version
 }
@@ -112,8 +111,7 @@ func (data *Data) Hash() []byte {
 		sum = append(sum, data.VersionList[i].Hash()...)
 	}
 	hash := sha256.Sum256(sum)
-	data.DataHash = hash[:]
-	return data.DataHash
+	return hash[:]
 }
 
 // ------------------------------------------------------------------------------------------------------------------- //
@@ -154,7 +152,6 @@ func (description *Description) Hash() []byte {
 
 /*	A version of data ... */
 type Version struct {
-	VersionHash     []byte
 	AcceptedPayload AcceptedPayload
 	Payload         Payload
 	Validation      Validation
@@ -164,8 +161,7 @@ func (version *Version) Hash() []byte {
 	sum := append(version.AcceptedPayload.Hash(), version.Payload.Hash()...)
 	sum = append(sum, version.Validation.Hash()...)
 	hash := sha256.Sum256(sum)
-	version.VersionHash = hash[:]
-	return version.VersionHash
+	return hash[:]
 }
 
 // ------------------------------------------------------------------------------------------------------------------- //

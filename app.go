@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	tendermint "github.com/tendermint/tendermint/abci/types"
 )
 
@@ -123,9 +122,7 @@ func (dbc *dataBlockChain) DeliverTx(requestDeliverTx tendermint.RequestDeliverT
 	_ = json.Unmarshal(tx, &transaction)
 	switch transaction.TxType {
 	case TxAddData:
-		fmt.Println("Yes, I do recognize that its an add data transaction")
 		description := *transaction.Description
-		fmt.Println("description:", description)
 		dbc.new.AddData(description)
 	case TxAddValidation:
 		validation := *transaction.Validation

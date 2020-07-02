@@ -103,7 +103,7 @@ func checkValidData(state *State, t *testing.T) {
 	checkNil(data.VersionList, "Version list", t)
 	compareDescription(data.Description, description, t)
 	dataHash := sha256.Sum256(description.Hash())
-	checkHash(data.DataHash, dataHash[:], "Data", t)
+	checkHash(data.Hash(), dataHash[:], "Data", t)
 	stateHash := sha256.Sum256(append(otherDataHash, dataHash[:]...))
 	checkHash(state.StateHash, stateHash[:], "State", t)
 }
@@ -176,9 +176,9 @@ func checkValidation(state *State, dataIndex int, zpk zpk, t *testing.T) {
 	emptyAcceptedPayload := AcceptedPayload{}
 	emptyPayload := Payload{}
 	versionHash := sha256.Sum256(append(append(emptyAcceptedPayload.Hash(), emptyPayload.Hash()...), validation.Hash()...))
-	checkHash(version.VersionHash, versionHash[:], "Version", t)
+	checkHash(version.Hash(), versionHash[:], "Version", t)
 	dataHash := sha256.Sum256(append(append(data.Description.Hash(), otherVersionHash...), versionHash[:]...))
-	checkHash(data.DataHash, dataHash[:], "Data", t)
+	checkHash(data.Hash(), dataHash[:], "Data", t)
 	stateHash := sha256.Sum256(append(append(dataHashL, dataHash[:]...), dataHashR...))
 	checkHash(state.StateHash, stateHash[:], "State", t)
 }
@@ -240,9 +240,9 @@ func checkPayload(state *State, dataIndex, versionIndex int, zpk zpk, t *testing
 	compareValidation(version.Validation, initialVersion.Validation, t)
 	emptyAcceptedPayload := AcceptedPayload{}
 	versionHash := sha256.Sum256(append(append(emptyAcceptedPayload.Hash(), payload.Hash()...), initialVersion.Validation.Hash()...))
-	checkHash(version.VersionHash, versionHash[:], "Version", t)
+	checkHash(version.Hash(), versionHash[:], "Version", t)
 	dataHash := sha256.Sum256(append(append(append(data.Description.Hash(), versionHashL...), versionHash[:]...), versionHashR...))
-	checkHash(data.DataHash, dataHash[:], "Data", t)
+	checkHash(data.Hash(), dataHash[:], "Data", t)
 	stateHash := sha256.Sum256(append(append(dataHashL, dataHash[:]...), dataHashR...))
 	checkHash(state.StateHash, stateHash[:], "State", t)
 }
@@ -302,9 +302,9 @@ func checkAcceptedPayload(state *State, dataIndex, versionIndex int, t *testing.
 	comparePayload(version.Payload, initialVersion.Payload, t)
 	compareValidation(version.Validation, initialVersion.Validation, t)
 	versionHash := sha256.Sum256(append(append(acceptedPayload.Hash(), initialVersion.Payload.Hash()...), initialVersion.Validation.Hash()...))
-	checkHash(version.VersionHash, versionHash[:], "Version", t)
+	checkHash(version.Hash(), versionHash[:], "Version", t)
 	dataHash := sha256.Sum256(append(append(append(data.Description.Hash(), versionHashL...), versionHash[:]...), versionHashR...))
-	checkHash(data.DataHash, dataHash[:], "Data", t)
+	checkHash(data.Hash(), dataHash[:], "Data", t)
 	stateHash := sha256.Sum256(append(append(dataHashL, dataHash[:]...), dataHashR...))
 	checkHash(state.StateHash, stateHash[:], "State", t)
 }
@@ -369,9 +369,9 @@ func dataLength(state *State, dataIndex int) (dataListLength, versionListLength 
 func dataHash(state *State, dataIndex int) (dataHashL, dataHashR []byte) {
 	for i, data := range state.DataList {
 		if i < dataIndex {
-			dataHashL = append(dataHashL, data.DataHash...)
+			dataHashL = append(dataHashL, data.Hash()...)
 		} else if i > dataIndex {
-			dataHashR = append(dataHashR, data.DataHash...)
+			dataHashR = append(dataHashR, data.Hash()...)
 		}
 	}
 	return
@@ -380,9 +380,9 @@ func dataHash(state *State, dataIndex int) (dataHashL, dataHashR []byte) {
 func versionHash(state *State, dataIndex, versionIndex int) (versionHashL, versionHashR []byte) {
 	for i, version := range state.DataList[dataIndex].VersionList {
 		if i < versionIndex {
-			versionHashL = append(versionHashL, version.VersionHash...)
+			versionHashL = append(versionHashL, version.Hash()...)
 		} else if i > versionIndex {
-			versionHashR = append(versionHashR, version.VersionHash...)
+			versionHashR = append(versionHashR, version.Hash()...)
 		}
 	}
 	return
