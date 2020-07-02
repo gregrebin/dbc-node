@@ -44,7 +44,6 @@ func (state *State) Hash() []byte {
 	state.StateHash = hash[:]
 	return state.StateHash
 }
-
 func (state *State) AddData(description Description) { // called at requireTx
 	id := append(description.ProviderInfo, description.DataInfo...)
 	isSigned := Verify(description.Requirer, id, description.Signature)
@@ -54,7 +53,6 @@ func (state *State) AddData(description Description) { // called at requireTx
 		state.Hash()
 	}
 }
-
 func (state *State) AddValidation(validation Validation, dataIndex int) { // called at validateTx
 	isTrusted := false
 	for _, trusted := range state.DataList[dataIndex].Description.TrustedValidators {
@@ -69,7 +67,6 @@ func (state *State) AddValidation(validation Validation, dataIndex int) { // cal
 		state.Hash()
 	}
 }
-
 func (state *State) AddPayload(payload Payload, dataIndex int, versionIndex int) { //called at provideTx
 	isProved := false
 	proof := sha256.Sum256(payload.Proof)
@@ -84,7 +81,6 @@ func (state *State) AddPayload(payload Payload, dataIndex int, versionIndex int)
 	}
 	// TODO: check if a payload already exists
 }
-
 func (state *State) AcceptPayload(acceptedPayload AcceptedPayload, dataIndex int, versionIndex int) { //called at acceptTx
 	isAcceptor := bytes.Compare(acceptedPayload.AcceptorAddr, state.DataList[dataIndex].Description.Acceptor) == 0
 	isSigned := Verify(acceptedPayload.AcceptorAddr, acceptedPayload.Data, acceptedPayload.Signature)
@@ -152,6 +148,9 @@ func (description *Description) Hash() []byte {
 	hash := sha256.Sum256(sum)
 	return hash[:]
 }
+
+// ------------------------------------------------------------------------------------------------------------------- //
+// VERSION
 
 /*	A version of data ... */
 type Version struct {

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	tendermint "github.com/tendermint/tendermint/abci/types"
 )
@@ -84,14 +83,8 @@ func (dbc *dataBlockChain) Query(requestQuery tendermint.RequestQuery) tendermin
 }
 
 func (dbc *dataBlockChain) CheckTx(requestCheckTx tendermint.RequestCheckTx) tendermint.ResponseCheckTx {
-	transaction := requestCheckTx.Tx
-	containsEqualSign := bytes.ContainsAny(transaction, "=")
-	code := uint32(0)
-	if !containsEqualSign {
-		code = 1
-	}
 	responseCheckTx := tendermint.ResponseCheckTx{
-		Code:      code,
+		Code:      uint32(0),
 		Data:      nil,
 		Log:       "",
 		Info:      "",
