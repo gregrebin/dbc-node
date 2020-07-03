@@ -61,6 +61,12 @@ func (dbc *dataBlockChain) Query(requestQuery tendermint.RequestQuery) tendermin
 	var value []byte
 	state := dbc.stateAtHeight(int(requestQuery.Height))
 	switch query.QrType {
+	case QueryBlockCount:
+		value, _ = json.Marshal(struct{ BlockCount int }{BlockCount: int(dbc.height)})
+	case QueryDataCount:
+		value, _ = json.Marshal(struct{ DataCount int }{DataCount: len(state.DataList)})
+	case QueryVersionCount:
+		value, _ = json.Marshal(struct{ VersionCount int }{VersionCount: len(state.DataList[query.DataIndex].VersionList)})
 	case QueryData:
 		value, _ = json.Marshal(state.DataList[query.DataIndex].Description)
 	case QueryValidation:
