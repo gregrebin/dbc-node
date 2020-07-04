@@ -24,10 +24,10 @@ type Transaction struct {
 type QueryType string
 
 const (
-	QueryBlockCount      QueryType = "QueryBlockCount"
-	QueryDataCount       QueryType = "QueryDataCount"
-	QueryVersionCount    QueryType = "QueryVersionCount"
+	QueryState           QueryType = "QueryState"
 	QueryData            QueryType = "QueryData"
+	QueryVersion         QueryType = "QueryVersion"
+	QueryDescription     QueryType = "QueryDescription"
 	QueryValidation      QueryType = "QueryValidation"
 	QueryPayload         QueryType = "QueryPayload"
 	QueryAcceptedPayload QueryType = "QueryAcceptedPayload"

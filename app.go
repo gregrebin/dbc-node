@@ -25,6 +25,9 @@ func NewDataBlockChain() *dataBlockChain {
 }
 
 func (dbc *dataBlockChain) stateAtHeight(height int) *State {
+	if dbc.confirmed == nil {
+		return nil
+	}
 	switch height {
 	case 0: // return state at current height: last confirmed state
 		return dbc.confirmed[len(dbc.confirmed)-1]
@@ -56,18 +59,21 @@ func (dbc *dataBlockChain) SetOption(requestSetOption tendermint.RequestSetOptio
 }
 
 func (dbc *dataBlockChain) Query(requestQuery tendermint.RequestQuery) tendermint.ResponseQuery {
+	data := make([]byte, base64.StdEncoding.DecodedLen(len(requestQuery.Data)))
+	_, _ = base64.StdEncoding.Decode(data, requestQuery.Data)
+	data = bytes.Trim(data, "\x00")
 	var query Query
-	_ = json.Unmarshal(requestQuery.Data, &query)
+	_ = json.Unmarshal(data, &query)
 	var value []byte
 	state := dbc.stateAtHeight(int(requestQuery.Height))
 	switch query.QrType {
-	case QueryBlockCount:
-		value, _ = json.Marshal(struct{ BlockCount int }{BlockCount: int(dbc.height)})
-	case QueryDataCount:
-		value, _ = json.Marshal(struct{ DataCount int }{DataCount: len(state.DataList)})
-	case QueryVersionCount:
-		value, _ = json.Marshal(struct{ VersionCount int }{VersionCount: len(state.DataList[query.DataIndex].VersionList)})
+	case QueryState:
+		value, _ = json.Marshal(state)
 	case QueryData:
+		value, _ = json.Marshal(state.DataList[query.DataIndex])
+	case QueryVersion:
+		value, _ = json.Marshal(state.DataList[query.DataIndex].VersionList[query.VersionIndex])
+	case QueryDescription:
 		value, _ = json.Marshal(state.DataList[query.DataIndex].Description)
 	case QueryValidation:
 		value, _ = json.Marshal(state.DataList[query.DataIndex].VersionList[query.VersionIndex].Validation)
@@ -162,7 +168,9 @@ func (dbc *dataBlockChain) EndBlock(requestEndBlock tendermint.RequestEndBlock) 
 }
 
 func (dbc *dataBlockChain) Commit() tendermint.ResponseCommit {
-	dbc.confirmed = append(dbc.confirmed, dbc.committed)
+	if dbc.height > 0 { // we don't append to confirmed in the first commit, since there's no committed state yet
+		dbc.confirmed = append(dbc.confirmed, dbc.committed)
+	}
 	dbc.committed = dbc.new
 	dbc.new = NewState(dbc.committed)
 	dbc.height++
