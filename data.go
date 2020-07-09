@@ -14,7 +14,7 @@ import (
 	"crypto/sha256"
 )
 
-// TODO: hash methods should not panic with nil receivers
+// TODO: refactoring
 
 type Empty interface {
 	IsEmpty() bool
@@ -88,20 +88,20 @@ func (state *State) AddPayload(payload *Payload, dataIndex int, versionIndex int
 		isProved = true
 	}
 	isSigned := Verify(payload.ProviderAddr, append(payload.Data, payload.Proof...), payload.Signature)
-	if isProved && isSigned {
+	isEmpty := state.DataList[dataIndex].VersionList[versionIndex].Payload.IsEmpty()
+	if isProved && isSigned && isEmpty {
 		state.DataList[dataIndex].VersionList[versionIndex].Payload = payload
 		state.Hash()
 	}
-	// TODO: check if a payload already exists
 }
 func (state *State) AcceptPayload(acceptedPayload *AcceptedPayload, dataIndex int, versionIndex int) { //called at acceptTx
 	isAcceptor := bytes.Compare(acceptedPayload.AcceptorAddr, state.DataList[dataIndex].Description.Acceptor) == 0
 	isSigned := Verify(acceptedPayload.AcceptorAddr, acceptedPayload.Data, acceptedPayload.Signature)
-	if isAcceptor && isSigned {
+	isEmpty := state.DataList[dataIndex].VersionList[versionIndex].AcceptedPayload.IsEmpty()
+	if isAcceptor && isSigned && isEmpty {
 		state.DataList[dataIndex].VersionList[versionIndex].AcceptedPayload = acceptedPayload
 		state.Hash()
 	}
-	// TODO: check if payload acceptance already exists
 }
 
 // ------------------------------------------------------------------------------------------------------------------- //

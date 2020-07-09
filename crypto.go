@@ -36,7 +36,6 @@ func Sign(privKey []byte, message []byte) (signature []byte) {
 	return sign.Serialize()
 }
 
-// TODO: leave only Verify exposed since it's the only function used
 func Verify(pubKey []byte, message []byte, signature []byte) (signed bool) {
 	hash := sha256.Sum256(message)
 	key, err := btcec.ParsePubKey(pubKey, btcec.S256())

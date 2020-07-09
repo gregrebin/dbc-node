@@ -7,6 +7,8 @@ import (
 	"testing"
 )
 
+// TODO: better tests
+
 func TestApp(t *testing.T) {
 	dbc := NewDataBlockChain()
 	_ = dbc.Info(mockRequestInfo())
@@ -40,7 +42,6 @@ func TestApp(t *testing.T) {
 		t.Errorf("Transaction not retained")
 	}
 	_ = dbc.Query(mockRequestQuery())
-	// TODO: needs better tests
 }
 
 func mockRequestInfo() types.RequestInfo {

@@ -7,6 +7,9 @@ import (
 	tendermint "github.com/tendermint/tendermint/abci/types"
 )
 
+// TODO: stake & unstake transactions and fees (stake economy)
+// TODO: consensus level payload validation (see: Whitepaper, Multiple Choice Problem)
+
 type dataBlockChain struct {
 	height    int64
 	confirmed []*State // written at 2nd commit
