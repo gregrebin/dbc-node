@@ -1,7 +1,8 @@
-package main
+package tests
 
 import (
 	"bytes"
+	"dbc-node/crypto"
 	"io/ioutil"
 	"os/exec"
 	"testing"
@@ -23,13 +24,13 @@ func init() {
 	_ = exec.Command("./key.sh", ecParamFile, privKeyFile, pubKeyFile).Run()
 	_ = ioutil.WriteFile(messageFile, []byte("Some message inside a file"), 0644)
 	_ = exec.Command("./sign.sh", privKeyFile, signatureFile, messageFile).Run()
-	privKey, pubKey = LoadKeys(privKeyFile, pubKeyFile)
+	privKey, pubKey = crypto.LoadKeys(privKeyFile, pubKeyFile)
 }
 
 func TestSignature(t *testing.T) {
 	message := []byte("Some message to be signed")
-	signature := Sign(privKey, message)
-	signed := Verify(pubKey, message, signature)
+	signature := crypto.Sign(privKey, message)
+	signed := crypto.Verify(pubKey, message, signature)
 	if !signed {
 		t.Fail()
 	}
@@ -37,8 +38,8 @@ func TestSignature(t *testing.T) {
 
 func TestOpenSslSignature(t *testing.T) {
 	message, _ := ioutil.ReadFile(messageFile)
-	signature := LoadSignature(signatureFile)
-	signed := Verify(pubKey, message, signature)
+	signature := crypto.LoadSignature(signatureFile)
+	signed := crypto.Verify(pubKey, message, signature)
 	if !signed {
 		t.Fail()
 	}
@@ -46,8 +47,8 @@ func TestOpenSslSignature(t *testing.T) {
 
 func TestEncryption(t *testing.T) {
 	message := []byte("Some message to be encrypted and decrypted")
-	encrypted := Encrypt(pubKey, message)
-	decrypted := Decrypt(privKey, encrypted)
+	encrypted := crypto.Encrypt(pubKey, message)
+	decrypted := crypto.Decrypt(privKey, encrypted)
 	difference := bytes.Compare(message, decrypted)
 	if difference != 0 {
 		t.Fail()

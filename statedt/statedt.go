@@ -1,4 +1,4 @@
-package main
+package statedt
 
 /*
 State contains a list of Data and the hash
@@ -12,6 +12,7 @@ Each new block a new state gets generated
 import (
 	"bytes"
 	"crypto/sha256"
+	"dbc-node/crypto"
 )
 
 // TODO: refactoring
@@ -59,7 +60,7 @@ func (state *State) Hash() []byte {
 }
 func (state *State) AddData(description *Description) { // called at requireTx
 	id := append(description.ProviderInfo, description.DataInfo...)
-	isSigned := Verify(description.Requirer, id, description.Signature)
+	isSigned := crypto.Verify(description.Requirer, id, description.Signature)
 	if isSigned {
 		data := Data{Description: description}
 		state.DataList = append(state.DataList, data)
@@ -73,7 +74,7 @@ func (state *State) AddValidation(validation *Validation, dataIndex int) { // ca
 			isTrusted = true
 		}
 	}
-	isSigned := Verify(validation.ValidatorAddr, validation.Info, validation.Signature)
+	isSigned := crypto.Verify(validation.ValidatorAddr, validation.Info, validation.Signature)
 	if isTrusted && isSigned {
 		version := Version{Validation: validation, Payload: &Payload{}, AcceptedPayload: &AcceptedPayload{}}
 		state.DataList[dataIndex].VersionList = append(state.DataList[dataIndex].VersionList, version)
@@ -87,7 +88,7 @@ func (state *State) AddPayload(payload *Payload, dataIndex int, versionIndex int
 	if bytes.Compare(proof[:], info) == 0 {
 		isProved = true
 	}
-	isSigned := Verify(payload.ProviderAddr, append(payload.Data, payload.Proof...), payload.Signature)
+	isSigned := crypto.Verify(payload.ProviderAddr, append(payload.Data, payload.Proof...), payload.Signature)
 	isEmpty := state.DataList[dataIndex].VersionList[versionIndex].Payload.IsEmpty()
 	if isProved && isSigned && isEmpty {
 		state.DataList[dataIndex].VersionList[versionIndex].Payload = payload
@@ -96,7 +97,7 @@ func (state *State) AddPayload(payload *Payload, dataIndex int, versionIndex int
 }
 func (state *State) AcceptPayload(acceptedPayload *AcceptedPayload, dataIndex int, versionIndex int) { //called at acceptTx
 	isAcceptor := bytes.Compare(acceptedPayload.AcceptorAddr, state.DataList[dataIndex].Description.Acceptor) == 0
-	isSigned := Verify(acceptedPayload.AcceptorAddr, acceptedPayload.Data, acceptedPayload.Signature)
+	isSigned := crypto.Verify(acceptedPayload.AcceptorAddr, acceptedPayload.Data, acceptedPayload.Signature)
 	isEmpty := state.DataList[dataIndex].VersionList[versionIndex].AcceptedPayload.IsEmpty()
 	if isAcceptor && isSigned && isEmpty {
 		state.DataList[dataIndex].VersionList[versionIndex].AcceptedPayload = acceptedPayload

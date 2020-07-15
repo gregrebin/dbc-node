@@ -1,4 +1,6 @@
-package main
+package messages
+
+import "dbc-node/statedt"
 
 type TransactionType string
 
@@ -12,10 +14,10 @@ const (
 type Transaction struct {
 	TxType TransactionType
 
-	Description     *Description
-	Validation      *Validation
-	Payload         *Payload
-	AcceptedPayload *AcceptedPayload
+	Description     *statedt.Description
+	Validation      *statedt.Validation
+	Payload         *statedt.Payload
+	AcceptedPayload *statedt.AcceptedPayload
 
 	DataIndex    int
 	VersionIndex int

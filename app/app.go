@@ -1,7 +1,9 @@
-package main
+package app
 
 import (
 	"bytes"
+	"dbc-node/messages"
+	"dbc-node/statedt"
 	"encoding/base64"
 	"encoding/json"
 	tendermint "github.com/tendermint/tendermint/abci/types"
@@ -11,33 +13,33 @@ import (
 // TODO: consensus level payload validation (see: Whitepaper, Multiple Choice Problem)
 
 type dataBlockChain struct {
-	height    int64
-	confirmed []*State // written at 2nd commit
-	committed *State   // written at 1st commit
-	new       *State   // written at deliverTx
+	Height    int64
+	Confirmed []*statedt.State // written at 2nd commit
+	Committed *statedt.State   // written at 1st commit
+	New       *statedt.State   // written at deliverTx
 }
 
 var _ tendermint.Application = (*dataBlockChain)(nil)
 
 func NewDataBlockChain() *dataBlockChain {
-	state := NewState(&State{})
+	state := statedt.NewState(&statedt.State{})
 	return &dataBlockChain{
-		height: 0,
-		new:    state,
+		Height: 0,
+		New:    state,
 	}
 }
 
-func (dbc *dataBlockChain) stateAtHeight(height int) *State {
-	if dbc.confirmed == nil {
+func (dbc *dataBlockChain) stateAtHeight(height int) *statedt.State {
+	if dbc.Confirmed == nil {
 		return nil
 	}
 	switch height {
 	case 0: // return state at current height: last confirmed state
-		return dbc.confirmed[len(dbc.confirmed)-1]
+		return dbc.Confirmed[len(dbc.Confirmed)-1]
 	case 1: // at height 1 there's no confirmed state
 		return nil
 	default: // confirmed states start at height 2
-		return dbc.confirmed[height-2]
+		return dbc.Confirmed[height-2]
 	}
 }
 
@@ -46,8 +48,8 @@ func (dbc *dataBlockChain) Info(requestInfo tendermint.RequestInfo) tendermint.R
 		Data:             "Some arbitrary information about dbc-node app",
 		Version:          "V1",
 		AppVersion:       1,
-		LastBlockHeight:  dbc.height,
-		LastBlockAppHash: dbc.committed.Hash(),
+		LastBlockHeight:  dbc.Height,
+		LastBlockAppHash: dbc.Committed.Hash(),
 	}
 	return responseInfo
 }
@@ -65,24 +67,24 @@ func (dbc *dataBlockChain) Query(requestQuery tendermint.RequestQuery) tendermin
 	data := make([]byte, base64.StdEncoding.DecodedLen(len(requestQuery.Data)))
 	_, _ = base64.StdEncoding.Decode(data, requestQuery.Data)
 	data = bytes.Trim(data, "\x00")
-	var query Query
+	var query messages.Query
 	_ = json.Unmarshal(data, &query)
 	var value []byte
 	state := dbc.stateAtHeight(int(requestQuery.Height))
 	switch query.QrType {
-	case QueryState:
+	case messages.QueryState:
 		value, _ = json.Marshal(state)
-	case QueryData:
+	case messages.QueryData:
 		value, _ = json.Marshal(state.DataList[query.DataIndex])
-	case QueryVersion:
+	case messages.QueryVersion:
 		value, _ = json.Marshal(state.DataList[query.DataIndex].VersionList[query.VersionIndex])
-	case QueryDescription:
+	case messages.QueryDescription:
 		value, _ = json.Marshal(state.DataList[query.DataIndex].Description)
-	case QueryValidation:
+	case messages.QueryValidation:
 		value, _ = json.Marshal(state.DataList[query.DataIndex].VersionList[query.VersionIndex].Validation)
-	case QueryPayload:
+	case messages.QueryPayload:
 		value, _ = json.Marshal(state.DataList[query.DataIndex].VersionList[query.VersionIndex].Payload)
-	case QueryAcceptedPayload:
+	case messages.QueryAcceptedPayload:
 		value, _ = json.Marshal(state.DataList[query.DataIndex].VersionList[query.VersionIndex].AcceptedPayload)
 	}
 	responseQuery := tendermint.ResponseQuery{
@@ -132,21 +134,21 @@ func (dbc *dataBlockChain) DeliverTx(requestDeliverTx tendermint.RequestDeliverT
 	tx := make([]byte, base64.StdEncoding.DecodedLen(len(requestDeliverTx.Tx)))
 	_, _ = base64.StdEncoding.Decode(tx, requestDeliverTx.Tx)
 	tx = bytes.Trim(tx, "\x00")
-	var transaction Transaction
+	var transaction messages.Transaction
 	_ = json.Unmarshal(tx, &transaction)
 	switch transaction.TxType {
-	case TxAddData:
+	case messages.TxAddData:
 		description := transaction.Description
-		dbc.new.AddData(description)
-	case TxAddValidation:
+		dbc.New.AddData(description)
+	case messages.TxAddValidation:
 		validation := transaction.Validation
-		dbc.new.AddValidation(validation, transaction.DataIndex)
-	case TxAddPayload:
+		dbc.New.AddValidation(validation, transaction.DataIndex)
+	case messages.TxAddPayload:
 		payload := transaction.Payload
-		dbc.new.AddPayload(payload, transaction.DataIndex, transaction.VersionIndex)
-	case TxAcceptPayload:
+		dbc.New.AddPayload(payload, transaction.DataIndex, transaction.VersionIndex)
+	case messages.TxAcceptPayload:
 		acceptedPayload := transaction.AcceptedPayload
-		dbc.new.AcceptPayload(acceptedPayload, transaction.DataIndex, transaction.VersionIndex)
+		dbc.New.AcceptPayload(acceptedPayload, transaction.DataIndex, transaction.VersionIndex)
 	}
 	responseDeliverTx := tendermint.ResponseDeliverTx{
 		Code:      uint32(0),
@@ -171,14 +173,14 @@ func (dbc *dataBlockChain) EndBlock(requestEndBlock tendermint.RequestEndBlock) 
 }
 
 func (dbc *dataBlockChain) Commit() tendermint.ResponseCommit {
-	if dbc.height > 0 { // we don't append to confirmed in the first commit, since there's no committed state yet
-		dbc.confirmed = append(dbc.confirmed, dbc.committed)
+	if dbc.Height > 0 { // we don't append to confirmed in the first commit, since there's no committed state yet
+		dbc.Confirmed = append(dbc.Confirmed, dbc.Committed)
 	}
-	dbc.committed = dbc.new
-	dbc.new = NewState(dbc.committed)
-	dbc.height++
+	dbc.Committed = dbc.New
+	dbc.New = statedt.NewState(dbc.Committed)
+	dbc.Height++
 	responseCommit := tendermint.ResponseCommit{
-		Data:         dbc.committed.Hash(),
+		Data:         dbc.Committed.Hash(),
 		RetainHeight: 0,
 	}
 	return responseCommit

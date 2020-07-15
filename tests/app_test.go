@@ -1,6 +1,8 @@
-package main
+package tests
 
 import (
+	"dbc-node/app"
+	"dbc-node/messages"
 	"encoding/base64"
 	"encoding/json"
 	"github.com/tendermint/tendermint/abci/types"
@@ -10,35 +12,35 @@ import (
 // TODO: better tests
 
 func TestApp(t *testing.T) {
-	dbc := NewDataBlockChain()
+	dbc := app.NewDataBlockChain()
 	_ = dbc.Info(mockRequestInfo())
 
 	_ = dbc.DeliverTx(mockRequestDeliverTx())
-	if len(dbc.new.DataList) != 1 {
+	if len(dbc.New.DataList) != 1 {
 		t.Errorf("Transaction not added")
 	}
 	_ = dbc.Commit()
-	if len(dbc.new.DataList) != 1 {
+	if len(dbc.New.DataList) != 1 {
 		t.Errorf("Transaction not retained")
 	}
 	_ = dbc.Query(mockRequestQuery())
 
 	_ = dbc.DeliverTx(mockRequestDeliverTx())
-	if len(dbc.new.DataList) != 2 {
+	if len(dbc.New.DataList) != 2 {
 		t.Errorf("Transaction not added")
 	}
 	_ = dbc.Commit()
-	if len(dbc.new.DataList) != 2 {
+	if len(dbc.New.DataList) != 2 {
 		t.Errorf("Transaction not retained")
 	}
 	_ = dbc.Query(mockRequestQuery())
 
 	_ = dbc.DeliverTx(mockRequestDeliverTx())
-	if len(dbc.new.DataList) != 3 {
+	if len(dbc.New.DataList) != 3 {
 		t.Errorf("Transaction not added")
 	}
 	_ = dbc.Commit()
-	if len(dbc.new.DataList) != 3 {
+	if len(dbc.New.DataList) != 3 {
 		t.Errorf("Transaction not retained")
 	}
 	_ = dbc.Query(mockRequestQuery())
@@ -54,8 +56,8 @@ func mockRequestInfo() types.RequestInfo {
 
 func mockRequestDeliverTx() types.RequestDeliverTx {
 	description := mockDescription()
-	transaction := Transaction{
-		TxType:       TxAddData,
+	transaction := messages.Transaction{
+		TxType:       messages.TxAddData,
 		Description:  description,
 		DataIndex:    0,
 		VersionIndex: 0,
@@ -69,8 +71,8 @@ func mockRequestDeliverTx() types.RequestDeliverTx {
 }
 
 func mockRequestQuery() types.RequestQuery {
-	query := Query{
-		QrType:       QueryState,
+	query := messages.Query{
+		QrType:       messages.QueryState,
 		DataIndex:    0,
 		VersionIndex: 0,
 	}

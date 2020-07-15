@@ -1,6 +1,7 @@
 package main
 
 import (
+	"dbc-node/app"
 	"flag"
 	"github.com/spf13/viper"
 	"github.com/tendermint/tendermint/config"
@@ -16,7 +17,7 @@ import (
 )
 
 func main() {
-	dataBlockChain := NewDataBlockChain()
+	dataBlockChain := app.NewDataBlockChain()
 
 	rootDir := flag.String("home", "./tmhome", "Tendermint home testDirectory path")
 	flag.Parse()
@@ -59,4 +60,3 @@ func main() {
 	<-sign
 	os.Exit(0)
 }
-
