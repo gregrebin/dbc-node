@@ -1,23 +1,16 @@
 
 # DATA BLOCKCHAIN
 
-Official implementation of Data Blockchain (DBC).
+Data blockchain is a decentralized data exchange platform, that stores encrypted 
+user data on a proof-of-stake blockchain. DBC enables users to require and provide 
+specific types of data, such as surveys, documents, invoices, etc. over a 
+decentralized network, proof that the part providing data is a certified entity
+with a zero-knowledge-proof algorithm, automate the verification of such data, 
+and the consequent actions, such as payment. DBC node is the reference 
+implementation written in Golang, using Tendermint middleware. 
 
-This is a Proof of Concept, for internal usage only. Functionality may change.
-The app is unstable.
-
-### Project objectives
-* Give a secure way to transmit data privately on a public ledger, from provider
-to requirer.
-* Give a way to proof that the part providing data is a real cerified entity
-(ex. has an official id) to everyone without revealing any private information about
-such entity.
-* Deterministically verify that the provided data satisfies the requested parameter 
-without revealing any data content to anyone, besides the requirer and the
-provider (data examples: survey, news, private message, medical certificate etc.).
-
-### Implementation
-...
+**This is a Proof of Concept, for internal usage only. Functionality may change.
+The app is unstable.**
 
 ### Installation
 DBC is written is Go and for now can be only compiled from source:

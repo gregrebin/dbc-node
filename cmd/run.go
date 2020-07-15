@@ -1,8 +1,8 @@
-package main
+package cmd
 
 import (
 	"dbc-node/app"
-	"flag"
+	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/tendermint/tendermint/config"
 	"github.com/tendermint/tendermint/libs/cli/flags"
@@ -16,17 +16,20 @@ import (
 	"syscall"
 )
 
-func main() {
+var RunCmd = &cobra.Command{
+	Use:   "run",
+	Short: "Run node",
+	Run:   run,
+}
+
+func run(cmd *cobra.Command, args []string) {
 	dataBlockChain := app.NewDataBlockChain()
 
-	rootDir := flag.String("home", "./tmhome", "Tendermint home testDirectory path")
-	flag.Parse()
-
 	configuration := config.DefaultConfig()
-	viper.SetConfigFile(*rootDir + "/config/config.toml")
+	viper.SetConfigFile(rootDir + "/config/config.toml")
 	viper.ReadInConfig()
 	viper.Unmarshal(configuration)
-	configuration.SetRoot(*rootDir)
+	configuration.SetRoot(rootDir)
 	configuration.ValidateBasic()
 
 	logger := log.NewTMLogger(log.NewSyncWriter(os.Stdout))
