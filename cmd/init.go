@@ -3,6 +3,10 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 	"github.com/tendermint/tendermint/config"
+	"github.com/tendermint/tendermint/p2p"
+	"github.com/tendermint/tendermint/privval"
+	"github.com/tendermint/tendermint/types"
+	"time"
 )
 
 var InitCmd = &cobra.Command{
@@ -14,6 +18,34 @@ var InitCmd = &cobra.Command{
 func initialize(cmd *cobra.Command, args []string) {
 	configuration := config.DefaultConfig()
 	configuration.SetRoot(rootDir)
-	configuration.ValidateBasic()
 	config.EnsureRoot(configuration.RootDir)
+
+	configuration.LogLevel = "consensus:error,*:info"
+	configuration.RPC.CORSAllowedOrigins = []string{"*"}
+	configuration.P2P.AllowDuplicateIP = true
+	configuration.Consensus.CreateEmptyBlocksInterval = time.Duration(10) * time.Second
+	configuration.ValidateBasic()
+	config.WriteConfigFile(rootDir+"/config/config.toml", configuration)
+
+	privValKeyFile := configuration.PrivValidatorKeyFile()
+	privValStateFile := configuration.PrivValidatorStateFile()
+	privVal := privval.GenFilePV(privValKeyFile, privValStateFile)
+	privVal.Save()
+
+	nodeKeyFile := configuration.NodeKeyFile()
+	p2p.LoadOrGenNodeKey(nodeKeyFile)
+
+	genFile := configuration.GenesisFile()
+	genDoc := types.GenesisDoc{
+		ChainID:         "datablockchain",
+		GenesisTime:     time.Now(),
+		ConsensusParams: types.DefaultConsensusParams(),
+	}
+	pubKey, _ := privVal.GetPubKey()
+	genDoc.Validators = []types.GenesisValidator{{
+		Address: pubKey.Address(),
+		PubKey:  pubKey,
+		Power:   10,
+	}}
+	genDoc.SaveAs(genFile)
 }
