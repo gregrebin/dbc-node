@@ -1,6 +1,8 @@
 package messages
 
-import "dbc-node/statedt"
+import (
+	"dbc-node/modules"
+)
 
 type TransactionType string
 
@@ -9,15 +11,18 @@ const (
 	TxAddValidation TransactionType = "TxAddValidation"
 	TxAddPayload    TransactionType = "TxAddPayload"
 	TxAcceptPayload TransactionType = "TxAcceptPayload"
+	TxTransferDBCC  TransactionType = "TxTransferDBCC"
+	TxStake         TransactionType = "TxStake"
+	TxUnstake       TransactionType = "TxUnstake"
 )
 
 type Transaction struct {
 	TxType TransactionType
 
-	Description     *statedt.Description
-	Validation      *statedt.Validation
-	Payload         *statedt.Payload
-	AcceptedPayload *statedt.AcceptedPayload
+	Description     *modules.Description
+	Validation      *modules.Validation
+	Payload         *modules.Payload
+	AcceptedPayload *modules.AcceptedPayload
 
 	DataIndex    int
 	VersionIndex int
@@ -33,6 +38,8 @@ const (
 	QueryValidation      QueryType = "QueryValidation"
 	QueryPayload         QueryType = "QueryPayload"
 	QueryAcceptedPayload QueryType = "QueryAcceptedPayload"
+	QueryDBCCBalance     QueryType = "QueryDBCCBalance"
+	QueryStake           QueryType = "QueryStake"
 )
 
 type Query struct {

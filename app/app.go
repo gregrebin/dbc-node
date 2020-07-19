@@ -3,7 +3,7 @@ package app
 import (
 	"bytes"
 	"dbc-node/messages"
-	"dbc-node/statedt"
+	"dbc-node/modules"
 	"encoding/base64"
 	"encoding/json"
 	tendermint "github.com/tendermint/tendermint/abci/types"
@@ -14,22 +14,22 @@ import (
 
 type dataBlockChain struct {
 	Height    int64
-	Confirmed []*statedt.State // written at 2nd commit
-	Committed *statedt.State   // written at 1st commit
-	New       *statedt.State   // written at deliverTx
+	Confirmed []*modules.State // written at 2nd commit
+	Committed *modules.State   // written at 1st commit
+	New       *modules.State   // written at deliverTx
 }
 
 var _ tendermint.Application = (*dataBlockChain)(nil)
 
 func NewDataBlockChain() *dataBlockChain {
-	state := statedt.NewState(&statedt.State{})
+	state := modules.NewState(&modules.State{})
 	return &dataBlockChain{
 		Height: 0,
 		New:    state,
 	}
 }
 
-func (dbc *dataBlockChain) stateAtHeight(height int) *statedt.State {
+func (dbc *dataBlockChain) stateAtHeight(height int) *modules.State {
 	if dbc.Confirmed == nil {
 		return nil
 	}
@@ -177,7 +177,7 @@ func (dbc *dataBlockChain) Commit() tendermint.ResponseCommit {
 		dbc.Confirmed = append(dbc.Confirmed, dbc.Committed)
 	}
 	dbc.Committed = dbc.New
-	dbc.New = statedt.NewState(dbc.Committed)
+	dbc.New = modules.NewState(dbc.Committed)
 	dbc.Height++
 	responseCommit := tendermint.ResponseCommit{
 		Data:         dbc.Committed.Hash(),
