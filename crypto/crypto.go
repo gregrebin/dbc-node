@@ -1,10 +1,11 @@
 package crypto
 
 import (
+	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/pem"
 	"github.com/btcsuite/btcd/btcec"
-	ecies "github.com/ecies/go"
+	"github.com/tendermint/tendermint/crypto"
 	"io/ioutil"
 )
 
@@ -14,7 +15,7 @@ const (
 	publicKeyStart  = 23
 )
 
-func LoadKeys(privKeyFile string, pubKeyFile string) (privKey []byte, pubKey []byte) {
+func LoadKeys(privKeyFile, pubKeyFile string) (privKey []byte, pubKey []byte) {
 	privKeyPem, _ := ioutil.ReadFile(privKeyFile)
 	pubKeyPem, _ := ioutil.ReadFile(pubKeyFile)
 	privKeyBlock, _ := pem.Decode(privKeyPem)
@@ -29,14 +30,20 @@ func LoadSignature(signatureFile string) (signature []byte) {
 	return
 }
 
-func Sign(privKey []byte, message []byte) (signature []byte) {
+func LoadTmKeys(privTmKey crypto.PrivKey, pubTmKey crypto.PubKey) (privKey []byte, pubKey []byte) {
+	privKey = privTmKey.Bytes()[5:]
+	pubKey = pubTmKey.Bytes()[5:]
+	return
+}
+
+func Sign(privKey, message []byte) (signature []byte) {
 	hash := sha256.Sum256(message)
 	key, _ := btcec.PrivKeyFromBytes(btcec.S256(), privKey)
 	sign, _ := key.Sign(hash[:])
 	return sign.Serialize()
 }
 
-func Verify(pubKey []byte, message []byte, signature []byte) (signed bool) {
+func Verify(pubKey, message []byte, signature []byte) (signed bool) {
 	hash := sha256.Sum256(message)
 	key, err := btcec.ParsePubKey(pubKey, btcec.S256())
 	if err != nil {
@@ -49,26 +56,10 @@ func Verify(pubKey []byte, message []byte, signature []byte) (signed bool) {
 	return sign.Verify(hash[:], key)
 }
 
-func Encrypt(pubKey []byte, message []byte) (encrypted []byte) {
-	key, _ := btcec.ParsePubKey(pubKey, btcec.S256())
-	encrypted, _ = btcec.Encrypt(key, message)
-	return
+func SignED(privKey, message []byte) (signature []byte) {
+	return ed25519.Sign(privKey, message)
 }
 
-func Encrypt2(pubKey []byte, message []byte) (encrypted []byte) {
-	key, _ := ecies.NewPublicKeyFromBytes(pubKey)
-	encrypted, _ = ecies.Encrypt(key, message)
-	return
-}
-
-func Decrypt(privKey []byte, encrypted []byte) (message []byte) {
-	key, _ := btcec.PrivKeyFromBytes(btcec.S256(), privKey)
-	message, _ = btcec.Decrypt(key, encrypted)
-	return
-}
-
-func Decrypt2(privKey []byte, decrypted []byte) (message []byte) {
-	key := ecies.NewPrivateKeyFromBytes(privKey)
-	decrypted, _ = ecies.Decrypt(key, message)
-	return
+func VerifyED(pubKey, message []byte, signature []byte) bool {
+	return ed25519.Verify(pubKey, message, signature)
 }

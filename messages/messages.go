@@ -13,7 +13,6 @@ const (
 	TxAcceptPayload TransactionType = "TxAcceptPayload"
 	TxTransferDBCC  TransactionType = "TxTransferDBCC"
 	TxStake         TransactionType = "TxStake"
-	TxUnstake       TransactionType = "TxUnstake"
 )
 
 type Transaction struct {
