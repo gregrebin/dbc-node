@@ -1,6 +1,7 @@
 package modules
 
 import (
+	"crypto/sha256"
 	"dbc-node/crypto"
 	"encoding/hex"
 	"strconv"
@@ -9,22 +10,33 @@ import (
 type Balance struct {
 	Users      map[string]int64
 	Validators map[string]int64
-	Transfers  []Transfer
-	Stakes     []Stake
+	GasPrice   map[string]int64
+	Transfers  []*Transfer
+	Stakes     []*Stake
 }
 
 func NewBalance(balance *Balance) *Balance {
 	return &Balance{
 		Users:      balance.Users,
 		Validators: balance.Validators,
+		Transfers:  balance.Transfers,
+		Stakes:     balance.Stakes,
 	}
 }
 
 func (balance *Balance) hash() []byte {
-	return nil
+	var sum []byte
+	for _, transfer := range balance.Transfers {
+		sum = append(sum, transfer.hash()...)
+	}
+	for _, stake := range balance.Stakes {
+		sum = append(sum, stake.hash()...)
+	}
+	hash := sha256.Sum256(sum)
+	return hash[:]
 }
 
-func (balance *Balance) AddTransfer(transfer Transfer) {
+func (balance *Balance) AddTransfer(transfer *Transfer) {
 	id := append(transfer.sender, transfer.receiver...)
 	id = append(id, []byte(strconv.FormatInt(transfer.amount, 10))...)
 	id = append(id, []byte(strconv.FormatInt(transfer.time, 10))...)
@@ -39,7 +51,7 @@ func (balance *Balance) AddTransfer(transfer Transfer) {
 	}
 }
 
-func (balance *Balance) AddStake(stake Stake) {
+func (balance *Balance) AddStake(stake *Stake) {
 	id := append(stake.user, stake.validator...)
 	id = append(id, []byte(strconv.FormatInt(stake.amount, 10))...)
 	id = append(id, []byte(strconv.FormatInt(stake.time, 10))...)
@@ -69,10 +81,28 @@ type Transfer struct {
 	signature []byte
 }
 
+func (transfer *Transfer) hash() []byte {
+	sum := append(transfer.sender, transfer.receiver...)
+	sum = append(sum, []byte(strconv.FormatInt(transfer.amount, 10))...)
+	sum = append(sum, []byte(strconv.FormatInt(transfer.time, 10))...)
+	sum = append(sum, transfer.signature...)
+	hash := sha256.Sum256(sum)
+	return hash[:]
+}
+
 type Stake struct {
 	user      []byte
 	validator []byte
 	amount    int64
 	time      int64
 	signature []byte
+}
+
+func (stake *Stake) hash() []byte {
+	sum := append(stake.user, stake.validator...)
+	sum = append(sum, []byte(strconv.FormatInt(stake.amount, 10))...)
+	sum = append(sum, []byte(strconv.FormatInt(stake.time, 10))...)
+	sum = append(sum, stake.signature...)
+	hash := sha256.Sum256(sum)
+	return hash[:]
 }
