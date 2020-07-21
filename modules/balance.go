@@ -4,23 +4,38 @@ import (
 	"crypto/sha256"
 	"dbc-node/crypto"
 	"encoding/hex"
+	"github.com/tendermint/tendermint/types"
 	"strconv"
 )
 
+const (
+	CoinName   = "DBCC"
+	MinUnit    = "SATS"
+	DbccSats   = 100000000
+	SatsSupply = types.MaxTotalVotingPower
+	DbccSupply = SatsSupply / DbccSats
+	TxFee      = 7700000
+)
+
 type Balance struct {
-	Users      map[string]int64
-	Validators map[string]int64
-	GasPrice   map[string]int64
-	Transfers  []*Transfer
-	Stakes     []*Stake
+	Users       map[string]int64
+	Validators  map[string]int64
+	Transfers   []*Transfer
+	Stakes      []*Stake
+	Rewards     map[[2]int]*Reward
+	ConfRewards map[[2]int]*bool
+	Fees        []*Fee
 }
 
 func NewBalance(balance *Balance) *Balance {
 	return &Balance{
-		Users:      balance.Users,
-		Validators: balance.Validators,
-		Transfers:  balance.Transfers,
-		Stakes:     balance.Stakes,
+		Users:       balance.Users,
+		Validators:  balance.Validators,
+		Transfers:   balance.Transfers,
+		Stakes:      balance.Stakes,
+		Rewards:     balance.Rewards,
+		ConfRewards: balance.ConfRewards,
+		Fees:        balance.Fees,
 	}
 }
 
@@ -73,6 +88,18 @@ func (balance *Balance) AddStake(stake *Stake) {
 	}
 }
 
+func (balance *Balance) AddReward(reward *Reward, dataIndex, versionIndex int) {
+
+}
+
+func (balance *Balance) ConfirmReward(dataIndex, versionIndex int) {
+
+}
+
+func (balance *Balance) AddFee(fee *Fee) {
+
+}
+
 type Transfer struct {
 	sender    []byte
 	receiver  []byte
@@ -105,4 +132,18 @@ func (stake *Stake) hash() []byte {
 	sum = append(sum, stake.signature...)
 	hash := sha256.Sum256(sum)
 	return hash[:]
+}
+
+type Reward struct {
+}
+
+func (reward *Reward) hash() []byte {
+	return nil
+}
+
+type Fee struct {
+}
+
+func (fee *Fee) hash() []byte {
+	return nil
 }
