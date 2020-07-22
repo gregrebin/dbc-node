@@ -11,7 +11,7 @@ const (
 	TxAddValidation TransactionType = "TxAddValidation"
 	TxAddPayload    TransactionType = "TxAddPayload"
 	TxAcceptPayload TransactionType = "TxAcceptPayload"
-	TxTransferDBCC  TransactionType = "TxTransferDBCC"
+	TxTransfer      TransactionType = "TxTransfer"
 	TxStake         TransactionType = "TxStake"
 )
 
@@ -37,7 +37,7 @@ const (
 	QueryValidation      QueryType = "QueryValidation"
 	QueryPayload         QueryType = "QueryPayload"
 	QueryAcceptedPayload QueryType = "QueryAcceptedPayload"
-	QueryDBCCBalance     QueryType = "QueryDBCCBalance"
+	QueryBalance         QueryType = "QueryBalance"
 	QueryStake           QueryType = "QueryStake"
 )
 

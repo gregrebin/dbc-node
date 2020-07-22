@@ -23,7 +23,7 @@ type Balance struct {
 	Transfers   []*Transfer
 	Stakes      []*Stake
 	Rewards     map[[2]int]*Reward
-	ConfRewards map[[2]int]*bool
+	ConfRewards map[[2]int]bool
 	Fees        []*Fee
 }
 
@@ -89,15 +89,34 @@ func (balance *Balance) AddStake(stake *Stake) {
 }
 
 func (balance *Balance) AddReward(reward *Reward, dataIndex, versionIndex int) {
-
+	dtRequirer := hex.EncodeToString(reward.dtRequirer)
+	totalAmount := reward.dtValidatorAmount + reward.dtProviderAmount + reward.dtAcceptorAmount
+	hasBalance := balance.Users[dtRequirer] >= totalAmount
+	if hasBalance {
+		balance.Rewards[[2]int{dataIndex, versionIndex}] = reward
+		dtValidator := hex.EncodeToString(reward.dtValidator)
+		dtProvider := hex.EncodeToString(reward.dtProvider)
+		dtAcceptor := hex.EncodeToString(reward.dtAcceptor)
+		balance.Users[dtRequirer] -= totalAmount
+		balance.Users[dtValidator] += reward.dtValidatorAmount
+		balance.Users[dtProvider] += reward.dtProviderAmount
+		balance.Users[dtAcceptor] += reward.dtAcceptorAmount
+	}
 }
 
 func (balance *Balance) ConfirmReward(dataIndex, versionIndex int) {
-
+	balance.ConfRewards[[2]int{dataIndex, versionIndex}] = true
 }
 
 func (balance *Balance) AddFee(fee *Fee) {
-
+	user := hex.EncodeToString(fee.user)
+	hasBalance := balance.Users[user] >= TxFee
+	if hasBalance {
+		balance.Fees = append(balance.Fees, fee)
+		validator := hex.EncodeToString(fee.validator)
+		balance.Users[user] -= TxFee
+		balance.Validators[validator] += TxFee
+	}
 }
 
 type Transfer struct {
@@ -135,15 +154,35 @@ func (stake *Stake) hash() []byte {
 }
 
 type Reward struct {
+	dtRequirer        []byte
+	dtValidator       []byte
+	dtProvider        []byte
+	dtAcceptor        []byte
+	dtValidatorAmount int64
+	dtProviderAmount  int64
+	dtAcceptorAmount  int64
 }
 
 func (reward *Reward) hash() []byte {
-	return nil
+	sum := append(reward.dtRequirer, reward.dtProvider...)
+	sum = append(sum, reward.dtProvider...)
+	sum = append(sum, reward.dtAcceptor...)
+	sum = append(sum, []byte(strconv.FormatInt(reward.dtValidatorAmount, 10))...)
+	sum = append(sum, []byte(strconv.FormatInt(reward.dtProviderAmount, 10))...)
+	sum = append(sum, []byte(strconv.FormatInt(reward.dtAcceptorAmount, 10))...)
+	hash := sha256.Sum256(sum)
+	return hash[:]
 }
 
 type Fee struct {
+	user      []byte
+	validator []byte
+	txHash    []byte
 }
 
 func (fee *Fee) hash() []byte {
-	return nil
+	sum := append(fee.user, fee.validator...)
+	sum = append(sum, fee.txHash...)
+	hash := sha256.Sum256(sum)
+	return hash[:]
 }
