@@ -4,28 +4,8 @@ import (
 	"dbc-node/crypto"
 	"github.com/tendermint/tendermint/crypto/ed25519"
 	"io/ioutil"
-	"os/exec"
 	"testing"
 )
-
-const (
-	privKeyFile   = testDirectory + "privkey.pem"
-	pubKeyFile    = testDirectory + "pubkey.pem"
-	signatureFile = testDirectory + "Signature.sing"
-	messageFile   = testDirectory + "file.txt"
-)
-
-var (
-	privKey []byte
-	pubKey  []byte
-)
-
-func init() {
-	_ = exec.Command("./key.sh", ecParamFile, privKeyFile, pubKeyFile).Run()
-	_ = ioutil.WriteFile(messageFile, []byte("Some message inside a file"), 0644)
-	_ = exec.Command("./sign.sh", privKeyFile, signatureFile, messageFile).Run()
-	privKey, pubKey = crypto.LoadKeys(privKeyFile, pubKeyFile)
-}
 
 func TestSignature(t *testing.T) {
 	message := []byte("Some message to be signed")

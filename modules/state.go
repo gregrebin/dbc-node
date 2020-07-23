@@ -15,8 +15,6 @@ import (
 	"dbc-node/crypto"
 )
 
-// TODO: refactoring
-
 type Empty interface {
 	IsEmpty() bool
 }

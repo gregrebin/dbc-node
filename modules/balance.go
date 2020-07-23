@@ -17,6 +17,8 @@ const (
 	TxFee      = 7700000
 )
 
+func ToSats(dbcc int64) int64 { return dbcc * DbccSats }
+
 type Balance struct {
 	Users       map[string]int64
 	Validators  map[string]int64
@@ -27,80 +29,112 @@ type Balance struct {
 	Fees        []*Fee
 }
 
-func NewBalance(balance *Balance) *Balance {
-	return &Balance{
-		Users:       balance.Users,
-		Validators:  balance.Validators,
-		Transfers:   balance.Transfers,
-		Stakes:      balance.Stakes,
-		Rewards:     balance.Rewards,
-		ConfRewards: balance.ConfRewards,
-		Fees:        balance.Fees,
+func NewBalance(oldBalance *Balance) *Balance {
+	balance := &Balance{
+		Users:       make(map[string]int64),
+		Validators:  make(map[string]int64),
+		Rewards:     make(map[[2]int]*Reward),
+		ConfRewards: make(map[[2]int]bool),
 	}
-}
-
-func (balance *Balance) hash() []byte {
-	var sum []byte
-	for _, transfer := range balance.Transfers {
-		sum = append(sum, transfer.hash()...)
+	for user, value := range oldBalance.Users {
+		balance.Users[user] = value
+	}
+	for validator, value := range oldBalance.Validators {
+		balance.Validators[validator] = value
+	}
+	for _, transfer := range oldBalance.Transfers {
+		balance.Transfers = append(balance.Transfers, transfer)
 	}
 	for _, stake := range balance.Stakes {
-		sum = append(sum, stake.hash()...)
+		balance.Stakes = append(balance.Stakes, stake)
+	}
+	for reward, value := range oldBalance.Rewards {
+		balance.Rewards[reward] = value
+	}
+	for conf, value := range oldBalance.ConfRewards {
+		balance.ConfRewards[conf] = value
+	}
+	for fee, value := range oldBalance.Fees {
+		balance.Fees[fee] = value
+	}
+	return balance
+}
+
+func (balance *Balance) Hash() []byte {
+	var sum []byte
+	for _, transfer := range balance.Transfers {
+		sum = append(sum, transfer.Hash()...)
+	}
+	for _, stake := range balance.Stakes {
+		sum = append(sum, stake.Hash()...)
+	}
+	for _, reward := range balance.Rewards {
+		sum = append(sum, reward.Hash()...)
+	}
+	for _, confirmed := range balance.ConfRewards {
+		if confirmed {
+			sum = append(sum, '\xFF')
+		} else {
+			sum = append(sum, '\x00')
+		}
+	}
+	for _, fee := range balance.Fees {
+		sum = append(sum, fee.Hash()...)
 	}
 	hash := sha256.Sum256(sum)
 	return hash[:]
 }
 
 func (balance *Balance) AddTransfer(transfer *Transfer) {
-	id := append(transfer.sender, transfer.receiver...)
-	id = append(id, []byte(strconv.FormatInt(transfer.amount, 10))...)
-	id = append(id, []byte(strconv.FormatInt(transfer.time, 10))...)
-	isSigned := crypto.Verify(transfer.sender, id, transfer.signature)
-	sender := hex.EncodeToString(transfer.sender)
-	hasBalance := balance.Users[sender] >= transfer.amount
+	id := append(transfer.Sender, transfer.Receiver...)
+	id = append(id, []byte(strconv.FormatInt(transfer.Amount, 10))...)
+	id = append(id, []byte(strconv.FormatInt(transfer.Time, 10))...)
+	isSigned := crypto.Verify(transfer.Sender, id, transfer.Signature)
+	sender := hex.EncodeToString(transfer.Sender)
+	hasBalance := balance.Users[sender] >= transfer.Amount
 	if isSigned && hasBalance {
 		balance.Transfers = append(balance.Transfers, transfer)
-		receiver := hex.EncodeToString(transfer.receiver)
-		balance.Users[sender] -= transfer.amount
-		balance.Users[receiver] += transfer.amount
+		receiver := hex.EncodeToString(transfer.Receiver)
+		balance.Users[sender] -= transfer.Amount
+		balance.Users[receiver] += transfer.Amount
 	}
 }
 
 func (balance *Balance) AddStake(stake *Stake) {
-	id := append(stake.user, stake.validator...)
-	id = append(id, []byte(strconv.FormatInt(stake.amount, 10))...)
-	id = append(id, []byte(strconv.FormatInt(stake.time, 10))...)
+	id := append(stake.User, stake.Validator...)
+	id = append(id, []byte(strconv.FormatInt(stake.Amount, 10))...)
+	id = append(id, []byte(strconv.FormatInt(stake.Time, 10))...)
 	isSigned := false
 	hasBalance := false
-	user := hex.EncodeToString(stake.user)
-	validator := hex.EncodeToString(stake.validator)
-	if stake.amount > 0 {
-		isSigned = crypto.Verify(stake.user, id, stake.signature)
-		hasBalance = balance.Users[user] >= stake.amount
-	} else if stake.amount < 0 {
-		isSigned = crypto.VerifyED(stake.validator, id, stake.signature)
-		hasBalance = balance.Validators[validator] >= -stake.amount
+	user := hex.EncodeToString(stake.User)
+	validator := hex.EncodeToString(stake.Validator)
+	if stake.Amount > 0 {
+		isSigned = crypto.Verify(stake.User, id, stake.Signature)
+		hasBalance = balance.Users[user] >= stake.Amount
+	} else if stake.Amount < 0 {
+		isSigned = crypto.VerifyED(stake.Validator, id, stake.Signature)
+		hasBalance = balance.Validators[validator] >= -stake.Amount
 	}
 	if isSigned && hasBalance {
 		balance.Stakes = append(balance.Stakes, stake)
-		balance.Users[user] -= stake.amount
-		balance.Validators[validator] += stake.amount
+		balance.Users[user] -= stake.Amount
+		balance.Validators[validator] += stake.Amount
 	}
 }
 
 func (balance *Balance) AddReward(reward *Reward, dataIndex, versionIndex int) {
-	dtRequirer := hex.EncodeToString(reward.dtRequirer)
-	totalAmount := reward.dtValidatorAmount + reward.dtProviderAmount + reward.dtAcceptorAmount
+	dtRequirer := hex.EncodeToString(reward.DtRequirer)
+	totalAmount := reward.DtValidatorAmount + reward.DtProviderAmount + reward.DtAcceptorAmount
 	hasBalance := balance.Users[dtRequirer] >= totalAmount
 	if hasBalance {
 		balance.Rewards[[2]int{dataIndex, versionIndex}] = reward
-		dtValidator := hex.EncodeToString(reward.dtValidator)
-		dtProvider := hex.EncodeToString(reward.dtProvider)
-		dtAcceptor := hex.EncodeToString(reward.dtAcceptor)
+		dtValidator := hex.EncodeToString(reward.DtValidator)
+		dtProvider := hex.EncodeToString(reward.DtProvider)
+		dtAcceptor := hex.EncodeToString(reward.DtAcceptor)
 		balance.Users[dtRequirer] -= totalAmount
-		balance.Users[dtValidator] += reward.dtValidatorAmount
-		balance.Users[dtProvider] += reward.dtProviderAmount
-		balance.Users[dtAcceptor] += reward.dtAcceptorAmount
+		balance.Users[dtValidator] += reward.DtValidatorAmount
+		balance.Users[dtProvider] += reward.DtProviderAmount
+		balance.Users[dtAcceptor] += reward.DtAcceptorAmount
 	}
 }
 
@@ -109,80 +143,80 @@ func (balance *Balance) ConfirmReward(dataIndex, versionIndex int) {
 }
 
 func (balance *Balance) AddFee(fee *Fee) {
-	user := hex.EncodeToString(fee.user)
+	user := hex.EncodeToString(fee.User)
 	hasBalance := balance.Users[user] >= TxFee
 	if hasBalance {
 		balance.Fees = append(balance.Fees, fee)
-		validator := hex.EncodeToString(fee.validator)
+		validator := hex.EncodeToString(fee.Validator)
 		balance.Users[user] -= TxFee
 		balance.Validators[validator] += TxFee
 	}
 }
 
 type Transfer struct {
-	sender    []byte
-	receiver  []byte
-	amount    int64
-	time      int64
-	signature []byte
+	Sender    []byte
+	Receiver  []byte
+	Amount    int64
+	Time      int64
+	Signature []byte
 }
 
-func (transfer *Transfer) hash() []byte {
-	sum := append(transfer.sender, transfer.receiver...)
-	sum = append(sum, []byte(strconv.FormatInt(transfer.amount, 10))...)
-	sum = append(sum, []byte(strconv.FormatInt(transfer.time, 10))...)
-	sum = append(sum, transfer.signature...)
+func (transfer *Transfer) Hash() []byte {
+	sum := append(transfer.Sender, transfer.Receiver...)
+	sum = append(sum, []byte(strconv.FormatInt(transfer.Amount, 10))...)
+	sum = append(sum, []byte(strconv.FormatInt(transfer.Time, 10))...)
+	sum = append(sum, transfer.Signature...)
 	hash := sha256.Sum256(sum)
 	return hash[:]
 }
 
 type Stake struct {
-	user      []byte
-	validator []byte
-	amount    int64
-	time      int64
-	signature []byte
+	User      []byte
+	Validator []byte
+	Amount    int64
+	Time      int64
+	Signature []byte
 }
 
-func (stake *Stake) hash() []byte {
-	sum := append(stake.user, stake.validator...)
-	sum = append(sum, []byte(strconv.FormatInt(stake.amount, 10))...)
-	sum = append(sum, []byte(strconv.FormatInt(stake.time, 10))...)
-	sum = append(sum, stake.signature...)
+func (stake *Stake) Hash() []byte {
+	sum := append(stake.User, stake.Validator...)
+	sum = append(sum, []byte(strconv.FormatInt(stake.Amount, 10))...)
+	sum = append(sum, []byte(strconv.FormatInt(stake.Time, 10))...)
+	sum = append(sum, stake.Signature...)
 	hash := sha256.Sum256(sum)
 	return hash[:]
 }
 
 type Reward struct {
-	dtRequirer        []byte
-	dtValidator       []byte
-	dtProvider        []byte
-	dtAcceptor        []byte
-	dtValidatorAmount int64
-	dtProviderAmount  int64
-	dtAcceptorAmount  int64
+	DtRequirer        []byte
+	DtValidator       []byte
+	DtProvider        []byte
+	DtAcceptor        []byte
+	DtValidatorAmount int64
+	DtProviderAmount  int64
+	DtAcceptorAmount  int64
 }
 
-func (reward *Reward) hash() []byte {
-	sum := append(reward.dtRequirer, reward.dtProvider...)
-	sum = append(sum, reward.dtProvider...)
-	sum = append(sum, reward.dtAcceptor...)
-	sum = append(sum, []byte(strconv.FormatInt(reward.dtValidatorAmount, 10))...)
-	sum = append(sum, []byte(strconv.FormatInt(reward.dtProviderAmount, 10))...)
-	sum = append(sum, []byte(strconv.FormatInt(reward.dtAcceptorAmount, 10))...)
+func (reward *Reward) Hash() []byte {
+	sum := append(reward.DtRequirer, reward.DtProvider...)
+	sum = append(sum, reward.DtProvider...)
+	sum = append(sum, reward.DtAcceptor...)
+	sum = append(sum, []byte(strconv.FormatInt(reward.DtValidatorAmount, 10))...)
+	sum = append(sum, []byte(strconv.FormatInt(reward.DtProviderAmount, 10))...)
+	sum = append(sum, []byte(strconv.FormatInt(reward.DtAcceptorAmount, 10))...)
 	hash := sha256.Sum256(sum)
 	return hash[:]
 }
 
 type Fee struct {
-	user      []byte
-	validator []byte
-	txHash    []byte
+	User      []byte
+	Validator []byte
+	TxHash    []byte
 }
 
-func (fee *Fee) hash() []byte {
-	sum := append(fee.user, fee.validator...)
-	sum = append(sum, fee.txHash...)
+func (fee *Fee) Hash() []byte {
+	sum := append(fee.User, fee.Validator...)
+	sum = append(sum, fee.TxHash...)
 	hash := sha256.Sum256(sum)
 	return hash[:]
 }

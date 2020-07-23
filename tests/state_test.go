@@ -6,71 +6,9 @@ import (
 	"dbc-node/crypto"
 	"dbc-node/modules"
 	"github.com/drhodes/golorem"
-	"os/exec"
 	"reflect"
 	"testing"
 )
-
-const (
-	requirerPrivKeyFile  = testDirectory + "requirerPrivKey.pem"
-	requirerPubKeyFile   = testDirectory + "requirerPubKey.pem"
-	validatorPrivKeyFile = testDirectory + "validatorPrivKey.pem"
-	validatorPubKeyFile  = testDirectory + "validatorPubKey.pem"
-	providerPrivKeyFile  = testDirectory + "providerPrivKey.pem"
-	providerPubKeyFile   = testDirectory + "providerPubKey.pem"
-	acceptorPrivKeyFile  = testDirectory + "acceptorPrivKey.pem"
-	acceptorPubKeyFile   = testDirectory + "acceptorPubKey.pem"
-)
-
-type zpk struct {
-	secret []byte
-	proof  []byte
-	info   []byte
-}
-
-var (
-	requirerPrivKey  []byte
-	requirerPubKey   []byte
-	validatorPrivKey []byte
-	validatorPubKey  []byte
-	providerPrivKey  []byte
-	providerPubKey   []byte
-	acceptorPrivKey  []byte
-	acceptorPubKey   []byte
-	zpks             []zpk
-	zpkToData        []int
-)
-
-// TODO: better tests (ex. check invalid)
-
-// ------------------------------------------------------------------------------------------------------------------- //
-// INITIALIZATION
-
-func init() {
-	initKeys()
-	initZpk()
-}
-
-func initKeys() {
-	_ = exec.Command("./key.sh", ecParamFile, requirerPrivKeyFile, requirerPubKeyFile).Run()
-	requirerPrivKey, requirerPubKey = crypto.LoadKeys(requirerPrivKeyFile, requirerPubKeyFile)
-	_ = exec.Command("./key.sh", ecParamFile, validatorPrivKeyFile, validatorPubKeyFile).Run()
-	validatorPrivKey, validatorPubKey = crypto.LoadKeys(validatorPrivKeyFile, validatorPubKeyFile)
-	_ = exec.Command("./key.sh", ecParamFile, providerPrivKeyFile, providerPubKeyFile).Run()
-	providerPrivKey, providerPubKey = crypto.LoadKeys(providerPrivKeyFile, providerPubKeyFile)
-	_ = exec.Command("./key.sh", ecParamFile, acceptorPrivKeyFile, acceptorPubKeyFile).Run()
-	acceptorPrivKey, acceptorPubKey = crypto.LoadKeys(acceptorPrivKeyFile, acceptorPubKeyFile)
-}
-
-func initZpk() {
-	for i := 0; i < 10; i++ {
-		secret := []byte(lorem.Sentence(0, 5))
-		proof := sha256.Sum256(secret)
-		info := sha256.Sum256(proof[:])
-		zpks = append(zpks, zpk{secret: secret, proof: proof[:], info: info[:]})
-	}
-	zpkToData = []int{0, 0, 0, 0, 2, 2, 2, 3, 3, 3}
-}
 
 // ------------------------------------------------------------------------------------------------------------------- //
 // EMPTY STATE

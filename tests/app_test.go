@@ -9,8 +9,6 @@ import (
 	"testing"
 )
 
-// TODO: better tests
-
 func TestApp(t *testing.T) {
 	dbc := app.NewDataBlockChain()
 	_ = dbc.Info(mockRequestInfo())

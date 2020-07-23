@@ -11,6 +11,9 @@ import (
 
 // TODO: stake & unstake transactions and fees (stake economy)
 // TODO: consensus level payload validation (see: Whitepaper, Multiple Choice Problem)
+// TODO: refactoring, better tests
+// TODO: cosmos sdk integration
+// TODO: ethereum integration
 
 type dataBlockChain struct {
 	Height    int64
