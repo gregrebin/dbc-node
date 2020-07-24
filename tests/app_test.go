@@ -14,31 +14,31 @@ func TestApp(t *testing.T) {
 	_ = dbc.Info(mockRequestInfo())
 
 	_ = dbc.DeliverTx(mockRequestDeliverTx())
-	if len(dbc.New.DataList) != 1 {
+	if len(dbc.New.Dataset.DataList) != 1 {
 		t.Errorf("Transaction not added")
 	}
 	_ = dbc.Commit()
-	if len(dbc.New.DataList) != 1 {
+	if len(dbc.New.Dataset.DataList) != 1 {
 		t.Errorf("Transaction not retained")
 	}
 	_ = dbc.Query(mockRequestQuery())
 
 	_ = dbc.DeliverTx(mockRequestDeliverTx())
-	if len(dbc.New.DataList) != 2 {
+	if len(dbc.New.Dataset.DataList) != 2 {
 		t.Errorf("Transaction not added")
 	}
 	_ = dbc.Commit()
-	if len(dbc.New.DataList) != 2 {
+	if len(dbc.New.Dataset.DataList) != 2 {
 		t.Errorf("Transaction not retained")
 	}
 	_ = dbc.Query(mockRequestQuery())
 
 	_ = dbc.DeliverTx(mockRequestDeliverTx())
-	if len(dbc.New.DataList) != 3 {
+	if len(dbc.New.Dataset.DataList) != 3 {
 		t.Errorf("Transaction not added")
 	}
 	_ = dbc.Commit()
-	if len(dbc.New.DataList) != 3 {
+	if len(dbc.New.Dataset.DataList) != 3 {
 		t.Errorf("Transaction not retained")
 	}
 	_ = dbc.Query(mockRequestQuery())

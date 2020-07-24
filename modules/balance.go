@@ -62,6 +62,9 @@ func NewBalance(oldBalance *Balance) *Balance {
 
 func (balance *Balance) Hash() []byte {
 	var sum []byte
+	if balance == nil {
+		return sum
+	}
 	for _, transfer := range balance.Transfers {
 		sum = append(sum, transfer.Hash()...)
 	}
