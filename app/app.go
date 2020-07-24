@@ -17,31 +17,31 @@ import (
 
 type dataBlockChain struct {
 	Height    int64
-	Confirmed []*modules.State // written at 2nd commit
-	Committed *modules.State   // written at 1st commit
-	New       *modules.State   // written at deliverTx
+	Confirmed []*modules.Dataset // written at 2nd commit
+	Committed *modules.Dataset   // written at 1st commit
+	New       *modules.Dataset   // written at deliverTx
 }
 
 var _ tendermint.Application = (*dataBlockChain)(nil)
 
 func NewDataBlockChain() *dataBlockChain {
-	state := modules.NewState(&modules.State{})
+	dataset := modules.NewDataset(&modules.Dataset{})
 	return &dataBlockChain{
 		Height: 0,
-		New:    state,
+		New:    dataset,
 	}
 }
 
-func (dbc *dataBlockChain) stateAtHeight(height int) *modules.State {
+func (dbc *dataBlockChain) datasetAtHeight(height int) *modules.Dataset {
 	if dbc.Confirmed == nil {
 		return nil
 	}
 	switch height {
-	case 0: // return state at current height: last confirmed state
+	case 0: // return dataset at current height: last confirmed dataset
 		return dbc.Confirmed[len(dbc.Confirmed)-1]
-	case 1: // at height 1 there's no confirmed state
+	case 1: // at height 1 there's no confirmed dataset
 		return nil
-	default: // confirmed states start at height 2
+	default: // confirmed dataset start at height 2
 		return dbc.Confirmed[height-2]
 	}
 }
@@ -73,22 +73,22 @@ func (dbc *dataBlockChain) Query(requestQuery tendermint.RequestQuery) tendermin
 	var query messages.Query
 	_ = json.Unmarshal(data, &query)
 	var value []byte
-	state := dbc.stateAtHeight(int(requestQuery.Height))
+	dataset := dbc.datasetAtHeight(int(requestQuery.Height))
 	switch query.QrType {
-	case messages.QueryState:
-		value, _ = json.Marshal(state)
+	case messages.QueryDataset:
+		value, _ = json.Marshal(dataset)
 	case messages.QueryData:
-		value, _ = json.Marshal(state.DataList[query.DataIndex])
+		value, _ = json.Marshal(dataset.DataList[query.DataIndex])
 	case messages.QueryVersion:
-		value, _ = json.Marshal(state.DataList[query.DataIndex].VersionList[query.VersionIndex])
+		value, _ = json.Marshal(dataset.DataList[query.DataIndex].VersionList[query.VersionIndex])
 	case messages.QueryDescription:
-		value, _ = json.Marshal(state.DataList[query.DataIndex].Description)
+		value, _ = json.Marshal(dataset.DataList[query.DataIndex].Description)
 	case messages.QueryValidation:
-		value, _ = json.Marshal(state.DataList[query.DataIndex].VersionList[query.VersionIndex].Validation)
+		value, _ = json.Marshal(dataset.DataList[query.DataIndex].VersionList[query.VersionIndex].Validation)
 	case messages.QueryPayload:
-		value, _ = json.Marshal(state.DataList[query.DataIndex].VersionList[query.VersionIndex].Payload)
+		value, _ = json.Marshal(dataset.DataList[query.DataIndex].VersionList[query.VersionIndex].Payload)
 	case messages.QueryAcceptedPayload:
-		value, _ = json.Marshal(state.DataList[query.DataIndex].VersionList[query.VersionIndex].AcceptedPayload)
+		value, _ = json.Marshal(dataset.DataList[query.DataIndex].VersionList[query.VersionIndex].AcceptedPayload)
 	}
 	responseQuery := tendermint.ResponseQuery{
 		Code:      uint32(0),
@@ -176,11 +176,11 @@ func (dbc *dataBlockChain) EndBlock(requestEndBlock tendermint.RequestEndBlock) 
 }
 
 func (dbc *dataBlockChain) Commit() tendermint.ResponseCommit {
-	if dbc.Height > 0 { // we don't append to confirmed in the first commit, since there's no committed state yet
+	if dbc.Height > 0 { // we don't append to confirmed in the first commit, since there's no committed dataset yet
 		dbc.Confirmed = append(dbc.Confirmed, dbc.Committed)
 	}
 	dbc.Committed = dbc.New
-	dbc.New = modules.NewState(dbc.Committed)
+	dbc.New = modules.NewDataset(dbc.Committed)
 	dbc.Height++
 	responseCommit := tendermint.ResponseCommit{
 		Data:         dbc.Committed.Hash(),

@@ -44,7 +44,7 @@ var (
 	providerPubKey   []byte
 	acceptorPrivKey  []byte
 	acceptorPubKey   []byte
-	// State
+	// Dataset
 	zpks      []zpk
 	zpkToData []int
 	// Balance
@@ -71,7 +71,7 @@ func init() {
 	providerPrivKey, providerPubKey = crypto.LoadKeys(providerPrivKeyFile, providerPubKeyFile)
 	_ = exec.Command("./key.sh", ecParamFile, acceptorPrivKeyFile, acceptorPubKeyFile).Run()
 	acceptorPrivKey, acceptorPubKey = crypto.LoadKeys(acceptorPrivKeyFile, acceptorPubKeyFile)
-	// State
+	// Dataset
 	for i := 0; i < 10; i++ {
 		secret := []byte(lorem.Sentence(0, 5))
 		proof := sha256.Sum256(secret)

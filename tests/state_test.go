@@ -11,13 +11,13 @@ import (
 )
 
 // ------------------------------------------------------------------------------------------------------------------- //
-// EMPTY STATE
+// EMPTY DATASET
 
-func TestEmptyState(t *testing.T) {
-	state := modules.NewState(&modules.State{})
-	checkNil(state.DataList, "Data list", t)
+func TestEmptyDataset(t *testing.T) {
+	dataset := modules.NewDataset(&modules.Dataset{})
+	checkNil(dataset.DataList, "Data list", t)
 	validHash := sha256.Sum256(nil)
-	checkHash(state.Hash(), validHash[:], "State hash", t)
+	checkHash(dataset.Hash(), validHash[:], "Dataset hash", t)
 
 }
 
@@ -25,27 +25,27 @@ func TestEmptyState(t *testing.T) {
 // NEW DATA
 
 func TestAddData(t *testing.T) {
-	state := mockState(false, false, false)
-	checkValidData(state, t)
-	checkValidData(state, t)
-	checkValidData(state, t)
+	dataset := mockDataset(false, false, false)
+	checkValidData(dataset, t)
+	checkValidData(dataset, t)
+	checkValidData(dataset, t)
 }
 
-func checkValidData(state *modules.State, t *testing.T) {
-	initialLength := len(state.DataList)
-	otherDataHash, _ := dataHash(state, initialLength)
+func checkValidData(dataset *modules.Dataset, t *testing.T) {
+	initialLength := len(dataset.DataList)
+	otherDataHash, _ := dataHash(dataset, initialLength)
 
 	description := mockDescription()
-	state.AddData(description)
-	data := state.DataList[initialLength]
+	dataset.AddData(description)
+	data := dataset.DataList[initialLength]
 
-	checkLength(state.DataList, initialLength+1, "Data list", t)
+	checkLength(dataset.DataList, initialLength+1, "Data list", t)
 	checkNil(data.VersionList, "Version list", t)
 	compareDescription(data.Description, description, t)
 	dataHash := sha256.Sum256(description.Hash())
 	checkHash(data.Hash(), dataHash[:], "Data", t)
-	stateHash := sha256.Sum256(append(otherDataHash, dataHash[:]...))
-	checkHash(state.Hash(), stateHash[:], "State", t)
+	datasetHash := sha256.Sum256(append(otherDataHash, dataHash[:]...))
+	checkHash(dataset.Hash(), datasetHash[:], "Dataset", t)
 }
 
 func mockDescription() *modules.Description {
@@ -88,28 +88,28 @@ func compareDescription(desc1, desc2 *modules.Description, t *testing.T) {
 // NEW VALIDATION
 
 func TestAddValidation(t *testing.T) {
-	state := mockState(true, false, false)
+	dataset := mockDataset(true, false, false)
 
-	checkValidation(state, 0, zpks[0], t)
-	checkValidation(state, 2, zpks[1], t)
-	checkValidation(state, 1, zpks[2], t)
-	checkValidation(state, 2, zpks[3], t)
-	checkValidation(state, 2, zpks[4], t)
-	checkValidation(state, 2, zpks[5], t)
+	checkValidation(dataset, 0, zpks[0], t)
+	checkValidation(dataset, 2, zpks[1], t)
+	checkValidation(dataset, 1, zpks[2], t)
+	checkValidation(dataset, 2, zpks[3], t)
+	checkValidation(dataset, 2, zpks[4], t)
+	checkValidation(dataset, 2, zpks[5], t)
 }
 
-func checkValidation(state *modules.State, dataIndex int, zpk zpk, t *testing.T) {
-	dataLength, versionLength := dataLength(state, dataIndex)
-	dataHashL, dataHashR := dataHash(state, dataIndex)
-	otherVersionHash, _ := versionHash(state, dataIndex, versionLength) // since we add a new version, we will have only versions at the left
+func checkValidation(dataset *modules.Dataset, dataIndex int, zpk zpk, t *testing.T) {
+	dataLength, versionLength := dataLength(dataset, dataIndex)
+	dataHashL, dataHashR := dataHash(dataset, dataIndex)
+	otherVersionHash, _ := versionHash(dataset, dataIndex, versionLength) // since we add a new version, we will have only versions at the left
 
 	validation := mockValidation(zpk)
-	state.AddValidation(validation, dataIndex)
-	data := state.DataList[dataIndex]
-	version := state.DataList[dataIndex].VersionList[versionLength]
+	dataset.AddValidation(validation, dataIndex)
+	data := dataset.DataList[dataIndex]
+	version := dataset.DataList[dataIndex].VersionList[versionLength]
 
-	checkLength(state.DataList, dataLength, "Data list", t)
-	checkLength(state.DataList[dataIndex].VersionList, versionLength+1, "Version list", t)
+	checkLength(dataset.DataList, dataLength, "Data list", t)
+	checkLength(dataset.DataList[dataIndex].VersionList, versionLength+1, "Version list", t)
 	checkEmpty(version.AcceptedPayload, "Accepted payload", t)
 	checkEmpty(version.Payload, "Payload", t)
 	compareValidation(version.Validation, validation, t)
@@ -119,8 +119,8 @@ func checkValidation(state *modules.State, dataIndex int, zpk zpk, t *testing.T)
 	checkHash(version.Hash(), versionHash[:], "Version", t)
 	dataHash := sha256.Sum256(append(append(data.Description.Hash(), otherVersionHash...), versionHash[:]...))
 	checkHash(data.Hash(), dataHash[:], "Data", t)
-	stateHash := sha256.Sum256(append(append(dataHashL, dataHash[:]...), dataHashR...))
-	checkHash(state.Hash(), stateHash[:], "State", t)
+	datasetHash := sha256.Sum256(append(append(dataHashL, dataHash[:]...), dataHashR...))
+	checkHash(dataset.Hash(), datasetHash[:], "Dataset", t)
 }
 
 func mockValidation(zpk zpk) *modules.Validation {
@@ -150,7 +150,7 @@ func compareValidation(val1, val2 *modules.Validation, t *testing.T) {
 // NEW PAYLOAD
 
 func TestAddPayload(t *testing.T) {
-	state := mockState(true, true, false)
+	dataset := mockDataset(true, true, false)
 	var versionIndex int
 	var lastDataIndex int
 	for zpkIndex, dataIndex := range zpkToData {
@@ -158,24 +158,24 @@ func TestAddPayload(t *testing.T) {
 			versionIndex = 0
 			lastDataIndex = dataIndex
 		}
-		checkPayload(state, dataIndex, versionIndex, zpks[zpkIndex], t)
+		checkPayload(dataset, dataIndex, versionIndex, zpks[zpkIndex], t)
 		versionIndex++
 	}
 }
 
-func checkPayload(state *modules.State, dataIndex, versionIndex int, zpk zpk, t *testing.T) {
-	dataLength, versionLength := dataLength(state, dataIndex)
-	dataHashL, dataHashR := dataHash(state, dataIndex)
-	versionHashL, versionHashR := versionHash(state, dataIndex, versionIndex)
-	initialVersion := state.DataList[dataIndex].VersionList[versionIndex]
+func checkPayload(dataset *modules.Dataset, dataIndex, versionIndex int, zpk zpk, t *testing.T) {
+	dataLength, versionLength := dataLength(dataset, dataIndex)
+	dataHashL, dataHashR := dataHash(dataset, dataIndex)
+	versionHashL, versionHashR := versionHash(dataset, dataIndex, versionIndex)
+	initialVersion := dataset.DataList[dataIndex].VersionList[versionIndex]
 
 	payload := mockPayload(zpk)
-	state.AddPayload(payload, dataIndex, versionIndex)
-	data := state.DataList[dataIndex]
-	version := state.DataList[dataIndex].VersionList[versionIndex]
+	dataset.AddPayload(payload, dataIndex, versionIndex)
+	data := dataset.DataList[dataIndex]
+	version := dataset.DataList[dataIndex].VersionList[versionIndex]
 
-	checkLength(state.DataList, dataLength, "Data list", t)
-	checkLength(state.DataList[dataIndex].VersionList, versionLength, "Version list", t)
+	checkLength(dataset.DataList, dataLength, "Data list", t)
+	checkLength(dataset.DataList[dataIndex].VersionList, versionLength, "Version list", t)
 	checkEmpty(version.AcceptedPayload, "Accepted payload", t)
 	comparePayload(version.Payload, payload, t)
 	compareValidation(version.Validation, initialVersion.Validation, t)
@@ -184,8 +184,8 @@ func checkPayload(state *modules.State, dataIndex, versionIndex int, zpk zpk, t 
 	checkHash(version.Hash(), versionHash[:], "Version", t)
 	dataHash := sha256.Sum256(append(append(append(data.Description.Hash(), versionHashL...), versionHash[:]...), versionHashR...))
 	checkHash(data.Hash(), dataHash[:], "Data", t)
-	stateHash := sha256.Sum256(append(append(dataHashL, dataHash[:]...), dataHashR...))
-	checkHash(state.Hash(), stateHash[:], "State", t)
+	datasetHash := sha256.Sum256(append(append(dataHashL, dataHash[:]...), dataHashR...))
+	checkHash(dataset.Hash(), datasetHash[:], "Dataset", t)
 }
 
 func mockPayload(zpk zpk) *modules.Payload {
@@ -219,27 +219,27 @@ func comparePayload(payload1, payload2 *modules.Payload, t *testing.T) {
 // ACCEPT PAYLOAD
 
 func TestAcceptPayload(t *testing.T) {
-	state := mockState(true, true, true)
-	for dataIndex, data := range state.DataList {
+	dataset := mockDataset(true, true, true)
+	for dataIndex, data := range dataset.DataList {
 		for versionIndex := range data.VersionList {
-			checkAcceptedPayload(state, dataIndex, versionIndex, t)
+			checkAcceptedPayload(dataset, dataIndex, versionIndex, t)
 		}
 	}
 }
 
-func checkAcceptedPayload(state *modules.State, dataIndex, versionIndex int, t *testing.T) {
-	dataLength, versionLength := dataLength(state, dataIndex)
-	dataHashL, dataHashR := dataHash(state, dataIndex)
-	versionHashL, versionHashR := versionHash(state, dataIndex, versionIndex)
-	initialVersion := state.DataList[dataIndex].VersionList[versionIndex]
+func checkAcceptedPayload(dataset *modules.Dataset, dataIndex, versionIndex int, t *testing.T) {
+	dataLength, versionLength := dataLength(dataset, dataIndex)
+	dataHashL, dataHashR := dataHash(dataset, dataIndex)
+	versionHashL, versionHashR := versionHash(dataset, dataIndex, versionIndex)
+	initialVersion := dataset.DataList[dataIndex].VersionList[versionIndex]
 
 	acceptedPayload := mockAcceptedPayload()
-	state.AcceptPayload(acceptedPayload, dataIndex, versionIndex)
-	data := state.DataList[dataIndex]
-	version := state.DataList[dataIndex].VersionList[versionIndex]
+	dataset.AcceptPayload(acceptedPayload, dataIndex, versionIndex)
+	data := dataset.DataList[dataIndex]
+	version := dataset.DataList[dataIndex].VersionList[versionIndex]
 
-	checkLength(state.DataList, dataLength, "Data list", t)
-	checkLength(state.DataList[dataIndex].VersionList, versionLength, "Version list", t)
+	checkLength(dataset.DataList, dataLength, "Data list", t)
+	checkLength(dataset.DataList[dataIndex].VersionList, versionLength, "Version list", t)
 	compareAcceptedPayload(version.AcceptedPayload, acceptedPayload, t)
 	comparePayload(version.Payload, initialVersion.Payload, t)
 	compareValidation(version.Validation, initialVersion.Validation, t)
@@ -247,8 +247,8 @@ func checkAcceptedPayload(state *modules.State, dataIndex, versionIndex int, t *
 	checkHash(version.Hash(), versionHash[:], "Version", t)
 	dataHash := sha256.Sum256(append(append(append(data.Description.Hash(), versionHashL...), versionHash[:]...), versionHashR...))
 	checkHash(data.Hash(), dataHash[:], "Data", t)
-	stateHash := sha256.Sum256(append(append(dataHashL, dataHash[:]...), dataHashR...))
-	checkHash(state.Hash(), stateHash[:], "State", t)
+	datasetHash := sha256.Sum256(append(append(dataHashL, dataHash[:]...), dataHashR...))
+	checkHash(dataset.Hash(), datasetHash[:], "Dataset", t)
 }
 
 func mockAcceptedPayload() *modules.AcceptedPayload {
@@ -277,40 +277,40 @@ func compareAcceptedPayload(acceptedPayload1, acceptedPayload2 *modules.Accepted
 // ------------------------------------------------------------------------------------------------------------------- //
 // TESTING UTILITIES
 
-func mockState(data, validation, payload bool) *modules.State {
+func mockDataset(data, validation, payload bool) *modules.Dataset {
 	if !data {
 		validation, payload = false, false
 	} else if !validation {
 		payload = false
 	}
-	state := modules.NewState(&modules.State{})
+	dataset := modules.NewDataset(&modules.Dataset{})
 	var versionIndex int
 	if data {
 		for zpkIndex, dataIndex := range zpkToData {
-			for len(state.DataList) <= dataIndex {
-				state.AddData(mockDescription())
+			for len(dataset.DataList) <= dataIndex {
+				dataset.AddData(mockDescription())
 				versionIndex = 0
 			}
 			if validation {
-				state.AddValidation(mockValidation(zpks[zpkIndex]), dataIndex)
+				dataset.AddValidation(mockValidation(zpks[zpkIndex]), dataIndex)
 			}
 			if payload {
-				state.AddPayload(mockPayload(zpks[zpkIndex]), dataIndex, versionIndex)
+				dataset.AddPayload(mockPayload(zpks[zpkIndex]), dataIndex, versionIndex)
 				versionIndex++
 			}
 		}
 	}
-	return state
+	return dataset
 }
 
-func dataLength(state *modules.State, dataIndex int) (dataListLength, versionListLength int) {
-	dataListLength = len(state.DataList)
-	versionListLength = len(state.DataList[dataIndex].VersionList)
+func dataLength(dataset *modules.Dataset, dataIndex int) (dataListLength, versionListLength int) {
+	dataListLength = len(dataset.DataList)
+	versionListLength = len(dataset.DataList[dataIndex].VersionList)
 	return
 }
 
-func dataHash(state *modules.State, dataIndex int) (dataHashL, dataHashR []byte) {
-	for i, data := range state.DataList {
+func dataHash(dataset *modules.Dataset, dataIndex int) (dataHashL, dataHashR []byte) {
+	for i, data := range dataset.DataList {
 		if i < dataIndex {
 			dataHashL = append(dataHashL, data.Hash()...)
 		} else if i > dataIndex {
@@ -320,8 +320,8 @@ func dataHash(state *modules.State, dataIndex int) (dataHashL, dataHashR []byte)
 	return
 }
 
-func versionHash(state *modules.State, dataIndex, versionIndex int) (versionHashL, versionHashR []byte) {
-	for i, version := range state.DataList[dataIndex].VersionList {
+func versionHash(dataset *modules.Dataset, dataIndex, versionIndex int) (versionHashL, versionHashR []byte) {
+	for i, version := range dataset.DataList[dataIndex].VersionList {
 		if i < versionIndex {
 			versionHashL = append(versionHashL, version.Hash()...)
 		} else if i > versionIndex {

@@ -70,7 +70,7 @@ func mockRequestDeliverTx() types.RequestDeliverTx {
 
 func mockRequestQuery() types.RequestQuery {
 	query := messages.Query{
-		QrType:       messages.QueryState,
+		QrType:       messages.QueryDataset,
 		DataIndex:    0,
 		VersionIndex: 0,
 	}

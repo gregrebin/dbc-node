@@ -22,6 +22,8 @@ type Transaction struct {
 	Validation      *modules.Validation
 	Payload         *modules.Payload
 	AcceptedPayload *modules.AcceptedPayload
+	Transfer        *modules.Transfer
+	Stake           *modules.Stake
 
 	DataIndex    int
 	VersionIndex int
@@ -30,7 +32,7 @@ type Transaction struct {
 type QueryType string
 
 const (
-	QueryState           QueryType = "QueryState"
+	QueryDataset         QueryType = "QueryDataset"
 	QueryData            QueryType = "QueryData"
 	QueryVersion         QueryType = "QueryVersion"
 	QueryDescription     QueryType = "QueryDescription"

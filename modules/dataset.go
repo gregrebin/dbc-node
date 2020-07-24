@@ -1,12 +1,12 @@
 package modules
 
 /*
-State contains a list of Data and the hash
+Dataset contains a list of Data and the hash
 Data contains Description and a list of versions and the hash
 Each version contains Validation, Payload and acceptedPayload
 A validation is just 3 arrays of bytes
 
-Each new block a new state gets generated
+Each new block a new dataset gets generated
 */
 
 import (
@@ -20,15 +20,15 @@ type Empty interface {
 }
 
 // ------------------------------------------------------------------------------------------------------------------- //
-// STATE
+// DATASET
 
-type State struct {
+type Dataset struct {
 	DataList []Data
 }
 
-func NewState(oldState *State) *State { // called every new block
-	state := &State{}
-	for _, oldData := range oldState.DataList {
+func NewDataset(old *Dataset) *Dataset { // called every new block
+	dataset := &Dataset{}
+	for _, oldData := range old.DataList {
 		data := Data{
 			Description: oldData.Description,
 		}
@@ -40,34 +40,34 @@ func NewState(oldState *State) *State { // called every new block
 			}
 			data.VersionList = append(data.VersionList, version)
 		}
-		state.DataList = append(state.DataList, data)
+		dataset.DataList = append(dataset.DataList, data)
 	}
-	return state
+	return dataset
 }
 
-func (state *State) Hash() []byte {
+func (dataset *Dataset) Hash() []byte {
 	var sum []byte
-	if state == nil {
+	if dataset == nil {
 		return sum
 	}
-	for i := range state.DataList {
-		sum = append(sum, state.DataList[i].Hash()...)
+	for i := range dataset.DataList {
+		sum = append(sum, dataset.DataList[i].Hash()...)
 	}
 	hash := sha256.Sum256(sum)
 	return hash[:]
 }
-func (state *State) AddData(description *Description) { // called at requireTx
+func (dataset *Dataset) AddData(description *Description) { // called at requireTx
 	id := append(description.ProviderInfo, description.DataInfo...)
 	isSigned := crypto.Verify(description.Requirer, id, description.Signature)
 	if isSigned {
 		data := Data{Description: description}
-		state.DataList = append(state.DataList, data)
-		state.Hash()
+		dataset.DataList = append(dataset.DataList, data)
+		dataset.Hash()
 	}
 }
-func (state *State) AddValidation(validation *Validation, dataIndex int) { // called at validateTx
+func (dataset *Dataset) AddValidation(validation *Validation, dataIndex int) { // called at validateTx
 	isTrusted := false
-	for _, trusted := range state.DataList[dataIndex].Description.TrustedValidators {
+	for _, trusted := range dataset.DataList[dataIndex].Description.TrustedValidators {
 		if bytes.Compare(validation.ValidatorAddr, trusted) == 0 {
 			isTrusted = true
 		}
@@ -75,31 +75,31 @@ func (state *State) AddValidation(validation *Validation, dataIndex int) { // ca
 	isSigned := crypto.Verify(validation.ValidatorAddr, validation.Info, validation.Signature)
 	if isTrusted && isSigned {
 		version := Version{Validation: validation, Payload: &Payload{}, AcceptedPayload: &AcceptedPayload{}}
-		state.DataList[dataIndex].VersionList = append(state.DataList[dataIndex].VersionList, version)
-		state.Hash()
+		dataset.DataList[dataIndex].VersionList = append(dataset.DataList[dataIndex].VersionList, version)
+		dataset.Hash()
 	}
 }
-func (state *State) AddPayload(payload *Payload, dataIndex int, versionIndex int) { //called at provideTx
+func (dataset *Dataset) AddPayload(payload *Payload, dataIndex int, versionIndex int) { //called at provideTx
 	isProved := false
 	proof := sha256.Sum256(payload.Proof)
-	info := state.DataList[dataIndex].VersionList[versionIndex].Validation.Info
+	info := dataset.DataList[dataIndex].VersionList[versionIndex].Validation.Info
 	if bytes.Compare(proof[:], info) == 0 {
 		isProved = true
 	}
 	isSigned := crypto.Verify(payload.ProviderAddr, append(payload.Data, payload.Proof...), payload.Signature)
-	isEmpty := state.DataList[dataIndex].VersionList[versionIndex].Payload.IsEmpty()
+	isEmpty := dataset.DataList[dataIndex].VersionList[versionIndex].Payload.IsEmpty()
 	if isProved && isSigned && isEmpty {
-		state.DataList[dataIndex].VersionList[versionIndex].Payload = payload
-		state.Hash()
+		dataset.DataList[dataIndex].VersionList[versionIndex].Payload = payload
+		dataset.Hash()
 	}
 }
-func (state *State) AcceptPayload(acceptedPayload *AcceptedPayload, dataIndex int, versionIndex int) { //called at acceptTx
-	isAcceptor := bytes.Compare(acceptedPayload.AcceptorAddr, state.DataList[dataIndex].Description.Acceptor) == 0
+func (dataset *Dataset) AcceptPayload(acceptedPayload *AcceptedPayload, dataIndex int, versionIndex int) { //called at acceptTx
+	isAcceptor := bytes.Compare(acceptedPayload.AcceptorAddr, dataset.DataList[dataIndex].Description.Acceptor) == 0
 	isSigned := crypto.Verify(acceptedPayload.AcceptorAddr, acceptedPayload.Data, acceptedPayload.Signature)
-	isEmpty := state.DataList[dataIndex].VersionList[versionIndex].AcceptedPayload.IsEmpty()
+	isEmpty := dataset.DataList[dataIndex].VersionList[versionIndex].AcceptedPayload.IsEmpty()
 	if isAcceptor && isSigned && isEmpty {
-		state.DataList[dataIndex].VersionList[versionIndex].AcceptedPayload = acceptedPayload
-		state.Hash()
+		dataset.DataList[dataIndex].VersionList[versionIndex].AcceptedPayload = acceptedPayload
+		dataset.Hash()
 	}
 }
 
