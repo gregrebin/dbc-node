@@ -3,45 +3,62 @@ package tests
 import (
 	"dbc-node/app"
 	"dbc-node/messages"
+	"dbc-node/modules"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"github.com/tendermint/tendermint/abci/types"
 	"testing"
 )
 
 func TestApp(t *testing.T) {
-	dbc := app.NewDataBlockChain()
+	dbc := app.NewDataBlockChain(genUsers)
 	_ = dbc.Info(mockRequestInfo())
 
-	_ = dbc.DeliverTx(mockRequestDeliverTx())
-	if len(dbc.New.Dataset.DataList) != 1 {
-		t.Errorf("Transaction not added")
-	}
-	_ = dbc.Commit()
-	if len(dbc.New.Dataset.DataList) != 1 {
-		t.Errorf("Transaction not retained")
-	}
-	_ = dbc.Query(mockRequestQuery())
+	checkTx(t, dbc, messages.TxAddData, 1)
+	checkTx(t, dbc, messages.TxAddData, 2)
+	checkTx(t, dbc, messages.TxAddData, 3)
+	checkTx(t, dbc, messages.TxTransfer, 1)
+	checkTx(t, dbc, messages.TxTransfer, 2)
+}
 
-	_ = dbc.DeliverTx(mockRequestDeliverTx())
-	if len(dbc.New.Dataset.DataList) != 2 {
-		t.Errorf("Transaction not added")
-	}
-	_ = dbc.Commit()
-	if len(dbc.New.Dataset.DataList) != 2 {
-		t.Errorf("Transaction not retained")
-	}
-	_ = dbc.Query(mockRequestQuery())
+func checkTx(t *testing.T, dbc *app.DataBlockChain, txType messages.TransactionType, txCount int) {
+	switch txType {
 
-	_ = dbc.DeliverTx(mockRequestDeliverTx())
-	if len(dbc.New.Dataset.DataList) != 3 {
-		t.Errorf("Transaction not added")
+	case messages.TxAddData:
+		_ = dbc.DeliverTx(mockRequestDeliverTx(messages.TxAddData))
+		if len(dbc.New.Dataset.DataList) != txCount {
+			t.Errorf("Transaction not added")
+		}
+		_ = dbc.Commit()
+		if len(dbc.New.Dataset.DataList) != txCount {
+			t.Errorf("Transaction not retained")
+		}
+		_ = dbc.Query(mockRequestQuery())
+
+	case messages.TxTransfer:
+		_ = dbc.DeliverTx(mockRequestDeliverTx(messages.TxTransfer))
+		if len(dbc.New.Balance.Transfers) != txCount {
+			t.Errorf("Transaction not added")
+		}
+		if dbc.New.Balance.Users[hex.EncodeToString(requirerPubKey)] != (genUsers[hex.EncodeToString(requirerPubKey)] - modules.ToSats(2*int64(txCount))) {
+			t.Errorf("Transfer amount not substracted")
+		}
+		if dbc.New.Balance.Users[hex.EncodeToString(acceptorPubKey)] != (genUsers[hex.EncodeToString(acceptorPubKey)] + modules.ToSats(2*int64(txCount))) {
+			t.Errorf("Transfer amount not substracted")
+		}
+		_ = dbc.Commit()
+		if len(dbc.New.Balance.Transfers) != txCount {
+			t.Errorf("Transaction not retained")
+		}
+		if dbc.New.Balance.Users[hex.EncodeToString(requirerPubKey)] != (genUsers[hex.EncodeToString(requirerPubKey)] - modules.ToSats(2*int64(txCount))) {
+			t.Errorf("Transfer amount not substracted")
+		}
+		if dbc.New.Balance.Users[hex.EncodeToString(acceptorPubKey)] != (genUsers[hex.EncodeToString(acceptorPubKey)] + modules.ToSats(2*int64(txCount))) {
+			t.Errorf("Transfer amount not substracted")
+		}
+		_ = dbc.Query(mockRequestQuery())
 	}
-	_ = dbc.Commit()
-	if len(dbc.New.Dataset.DataList) != 3 {
-		t.Errorf("Transaction not retained")
-	}
-	_ = dbc.Query(mockRequestQuery())
 }
 
 func mockRequestInfo() types.RequestInfo {
@@ -52,13 +69,31 @@ func mockRequestInfo() types.RequestInfo {
 	}
 }
 
-func mockRequestDeliverTx() types.RequestDeliverTx {
-	description := mockDescription()
+func mockRequestDeliverTx(txType messages.TransactionType) types.RequestDeliverTx {
 	transaction := messages.Transaction{
-		TxType:       messages.TxAddData,
-		Description:  description,
+		TxType:       txType,
 		DataIndex:    0,
 		VersionIndex: 0,
+	}
+	switch txType {
+	case messages.TxAddData:
+		description := mockDescription()
+		transaction.Description = description
+	case messages.TxAddValidation:
+		validation := mockValidation(zpks[0])
+		transaction.Validation = validation
+	case messages.TxAddPayload:
+		payload := mockPayload(zpks[0])
+		transaction.Payload = payload
+	case messages.TxAcceptPayload:
+		acceptedPayload := mockAcceptedPayload()
+		transaction.AcceptedPayload = acceptedPayload
+	case messages.TxTransfer:
+		transfer := mockTransfer(requirerPubKey, requirerPrivKey, acceptorPubKey, modules.ToSats(2))
+		transaction.Transfer = transfer
+	case messages.TxStake:
+		stake := mockStake(providerPubKey, providerPrivKey, validatorPubKey, validatorPrivKey, modules.ToSats(1))
+		transaction.Stake = stake
 	}
 	tx, _ := json.Marshal(transaction)
 	encodedTx := make([]byte, base64.StdEncoding.EncodedLen(len(tx)))

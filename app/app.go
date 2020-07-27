@@ -15,7 +15,7 @@ import (
 // TODO: cosmos sdk integration
 // TODO: ethereum integration
 
-type dataBlockChain struct {
+type DataBlockChain struct {
 	Height    int64
 	Confirmed []state // written at 2nd commit
 	Committed state   // written at 1st commit
@@ -31,20 +31,22 @@ func (state state) hash() []byte {
 	return append(state.Dataset.Hash(), state.Balance.Hash()...)
 }
 
-var _ tendermint.Application = (*dataBlockChain)(nil)
+var _ tendermint.Application = (*DataBlockChain)(nil)
 
-func NewDataBlockChain() *dataBlockChain {
+func NewDataBlockChain(genUsers map[string]int64) *DataBlockChain {
 	state := state{
 		Dataset: modules.NewDataset(&modules.Dataset{}),
-		Balance: modules.NewBalance(&modules.Balance{}),
+		Balance: modules.NewBalance(&modules.Balance{
+			Users: genUsers,
+		}),
 	}
-	return &dataBlockChain{
+	return &DataBlockChain{
 		Height: 0,
 		New:    state,
 	}
 }
 
-func (dbc *dataBlockChain) stateAtHeight(height int) state {
+func (dbc *DataBlockChain) stateAtHeight(height int) state {
 	if dbc.Confirmed == nil {
 		return state{}
 	}
@@ -58,7 +60,7 @@ func (dbc *dataBlockChain) stateAtHeight(height int) state {
 	}
 }
 
-func (dbc *dataBlockChain) Info(requestInfo tendermint.RequestInfo) tendermint.ResponseInfo {
+func (dbc *DataBlockChain) Info(requestInfo tendermint.RequestInfo) tendermint.ResponseInfo {
 	responseInfo := tendermint.ResponseInfo{
 		Data:             "Some arbitrary information about dbc-node app",
 		Version:          "V1",
@@ -69,7 +71,7 @@ func (dbc *dataBlockChain) Info(requestInfo tendermint.RequestInfo) tendermint.R
 	return responseInfo
 }
 
-func (dbc *dataBlockChain) SetOption(requestSetOption tendermint.RequestSetOption) tendermint.ResponseSetOption {
+func (dbc *DataBlockChain) SetOption(requestSetOption tendermint.RequestSetOption) tendermint.ResponseSetOption {
 	responseSetOption := tendermint.ResponseSetOption{
 		Code: 0,
 		Log:  "",
@@ -78,7 +80,7 @@ func (dbc *dataBlockChain) SetOption(requestSetOption tendermint.RequestSetOptio
 	return responseSetOption
 }
 
-func (dbc *dataBlockChain) Query(requestQuery tendermint.RequestQuery) tendermint.ResponseQuery {
+func (dbc *DataBlockChain) Query(requestQuery tendermint.RequestQuery) tendermint.ResponseQuery {
 	data := make([]byte, base64.StdEncoding.DecodedLen(len(requestQuery.Data)))
 	_, _ = base64.StdEncoding.Decode(data, requestQuery.Data)
 	data = bytes.Trim(data, "\x00")
@@ -116,7 +118,7 @@ func (dbc *dataBlockChain) Query(requestQuery tendermint.RequestQuery) tendermin
 	return responseQuery
 }
 
-func (dbc *dataBlockChain) CheckTx(requestCheckTx tendermint.RequestCheckTx) tendermint.ResponseCheckTx {
+func (dbc *DataBlockChain) CheckTx(requestCheckTx tendermint.RequestCheckTx) tendermint.ResponseCheckTx {
 	responseCheckTx := tendermint.ResponseCheckTx{
 		Code:      uint32(0),
 		Data:      nil,
@@ -130,7 +132,7 @@ func (dbc *dataBlockChain) CheckTx(requestCheckTx tendermint.RequestCheckTx) ten
 	return responseCheckTx
 }
 
-func (dbc *dataBlockChain) InitChain(requestInitChain tendermint.RequestInitChain) tendermint.ResponseInitChain {
+func (dbc *DataBlockChain) InitChain(requestInitChain tendermint.RequestInitChain) tendermint.ResponseInitChain {
 	responseInitChain := tendermint.ResponseInitChain{
 		ConsensusParams: nil,
 		Validators:      nil,
@@ -138,14 +140,14 @@ func (dbc *dataBlockChain) InitChain(requestInitChain tendermint.RequestInitChai
 	return responseInitChain
 }
 
-func (dbc *dataBlockChain) BeginBlock(requestBeginBlock tendermint.RequestBeginBlock) tendermint.ResponseBeginBlock {
+func (dbc *DataBlockChain) BeginBlock(requestBeginBlock tendermint.RequestBeginBlock) tendermint.ResponseBeginBlock {
 	responseBeginBlock := tendermint.ResponseBeginBlock{
 		Events: nil,
 	}
 	return responseBeginBlock
 }
 
-func (dbc *dataBlockChain) DeliverTx(requestDeliverTx tendermint.RequestDeliverTx) tendermint.ResponseDeliverTx {
+func (dbc *DataBlockChain) DeliverTx(requestDeliverTx tendermint.RequestDeliverTx) tendermint.ResponseDeliverTx {
 	tx := make([]byte, base64.StdEncoding.DecodedLen(len(requestDeliverTx.Tx)))
 	_, _ = base64.StdEncoding.Decode(tx, requestDeliverTx.Tx)
 	tx = bytes.Trim(tx, "\x00")
@@ -164,6 +166,12 @@ func (dbc *dataBlockChain) DeliverTx(requestDeliverTx tendermint.RequestDeliverT
 	case messages.TxAcceptPayload:
 		acceptedPayload := transaction.AcceptedPayload
 		dbc.New.Dataset.AcceptPayload(acceptedPayload, transaction.DataIndex, transaction.VersionIndex)
+	case messages.TxTransfer:
+		transfer := transaction.Transfer
+		dbc.New.Balance.AddTransfer(transfer)
+	case messages.TxStake:
+		stake := transaction.Stake
+		dbc.New.Balance.AddStake(stake)
 	}
 	responseDeliverTx := tendermint.ResponseDeliverTx{
 		Code:      uint32(0),
@@ -178,7 +186,7 @@ func (dbc *dataBlockChain) DeliverTx(requestDeliverTx tendermint.RequestDeliverT
 	return responseDeliverTx
 }
 
-func (dbc *dataBlockChain) EndBlock(requestEndBlock tendermint.RequestEndBlock) tendermint.ResponseEndBlock {
+func (dbc *DataBlockChain) EndBlock(requestEndBlock tendermint.RequestEndBlock) tendermint.ResponseEndBlock {
 	responseEndBlock := tendermint.ResponseEndBlock{
 		ValidatorUpdates:      nil,
 		ConsensusParamUpdates: nil,
@@ -187,7 +195,7 @@ func (dbc *dataBlockChain) EndBlock(requestEndBlock tendermint.RequestEndBlock) 
 	return responseEndBlock
 }
 
-func (dbc *dataBlockChain) Commit() tendermint.ResponseCommit {
+func (dbc *DataBlockChain) Commit() tendermint.ResponseCommit {
 	if dbc.Height > 0 { // we don't append to confirmed in the first commit, since there's no committed state yet
 		dbc.Confirmed = append(dbc.Confirmed, dbc.Committed)
 	}

@@ -54,6 +54,9 @@ var (
 	stakePrivKey      []byte
 	stakePubKey       []byte
 	initialValidators map[string]int64
+	// App
+	genUsers      map[string]int64
+	genValidators map[string]int64
 )
 
 func init() {
@@ -96,6 +99,9 @@ func init() {
 	stakePrivKey, stakePubKey = crypto.LoadTmKeys(tmPrivKey, tmPrivKey.PubKey())
 	initialValidators = make(map[string]int64, 1)
 	initialValidators[hex.EncodeToString(stakePubKey)] = modules.ToSats(initialStake)
+	// App
+	genUsers = initialUsers
+	genValidators = initialValidators
 }
 
 type zpk struct {
