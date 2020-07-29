@@ -23,7 +23,7 @@ var RunCmd = &cobra.Command{
 }
 
 func run(cmd *cobra.Command, args []string) {
-	dataBlockChain := app.NewDataBlockChain(genUsers)
+	dataBlockChain := app.NewDataBlockChain(genUsers, genValidators)
 
 	configuration := config.DefaultConfig()
 	viper.SetConfigFile(rootDir + "/config/config.toml")

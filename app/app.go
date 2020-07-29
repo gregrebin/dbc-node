@@ -5,6 +5,7 @@ import (
 	"dbc-node/messages"
 	"dbc-node/modules"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	tendermint "github.com/tendermint/tendermint/abci/types"
 )
@@ -33,11 +34,12 @@ func (state state) hash() []byte {
 
 var _ tendermint.Application = (*DataBlockChain)(nil)
 
-func NewDataBlockChain(genUsers map[string]int64) *DataBlockChain {
+func NewDataBlockChain(genUsers, genValidators map[string]int64) *DataBlockChain {
 	state := state{
 		Dataset: modules.NewDataset(&modules.Dataset{}),
 		Balance: modules.NewBalance(&modules.Balance{
-			Users: genUsers,
+			Users:      genUsers,
+			Validators: genValidators,
 		}),
 	}
 	return &DataBlockChain{
@@ -187,8 +189,15 @@ func (dbc *DataBlockChain) DeliverTx(requestDeliverTx tendermint.RequestDeliverT
 }
 
 func (dbc *DataBlockChain) EndBlock(requestEndBlock tendermint.RequestEndBlock) tendermint.ResponseEndBlock {
+	validatorUpdates := tendermint.ValidatorUpdates{}
+	for _, stake := range dbc.New.Balance.Stakes {
+		validator := stake.Validator
+		stake := dbc.New.Balance.Validators[hex.EncodeToString(validator)]
+		validatorUpdate := tendermint.Ed25519ValidatorUpdate(validator, stake)
+		validatorUpdates = append(validatorUpdates, validatorUpdate)
+	}
 	responseEndBlock := tendermint.ResponseEndBlock{
-		ValidatorUpdates:      nil,
+		ValidatorUpdates:      validatorUpdates,
 		ConsensusParamUpdates: nil,
 		Events:                nil,
 	}

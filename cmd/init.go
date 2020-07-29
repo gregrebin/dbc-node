@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/hex"
 	"github.com/spf13/cobra"
 	"github.com/tendermint/tendermint/config"
 	"github.com/tendermint/tendermint/p2p"
@@ -41,11 +42,12 @@ func initialize(cmd *cobra.Command, args []string) {
 		GenesisTime:     time.Now(),
 		ConsensusParams: types.DefaultConsensusParams(),
 	}
-	pubKey, _ := privVal.GetPubKey()
-	genDoc.Validators = []types.GenesisValidator{{
-		Address: pubKey.Address(),
-		PubKey:  pubKey,
-		Power:   10,
-	}}
+	for _, key := range genValidatorKeys {
+		genDoc.Validators = append(genDoc.Validators, types.GenesisValidator{
+			Address: key.Address(),
+			PubKey:  key,
+			Power:   genValidators[hex.EncodeToString(key[:])],
+		})
+	}
 	genDoc.SaveAs(genFile)
 }

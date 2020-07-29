@@ -45,7 +45,7 @@ func NewBalance(oldBalance *Balance) *Balance {
 	for _, transfer := range oldBalance.Transfers {
 		balance.Transfers = append(balance.Transfers, transfer)
 	}
-	for _, stake := range balance.Stakes {
+	for _, stake := range oldBalance.Stakes {
 		balance.Stakes = append(balance.Stakes, stake)
 	}
 	for reward, value := range oldBalance.Rewards {
