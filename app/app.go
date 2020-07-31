@@ -92,7 +92,7 @@ func (dbc *DataBlockChain) Query(requestQuery tendermint.RequestQuery) tendermin
 	state := dbc.stateAtHeight(int(requestQuery.Height))
 	switch query.QrType {
 	case messages.QueryDataset:
-		value, _ = json.Marshal(state)
+		value, _ = json.Marshal(state.Dataset)
 	case messages.QueryData:
 		value, _ = json.Marshal(state.Dataset.DataList[query.DataIndex])
 	case messages.QueryVersion:
@@ -105,6 +105,10 @@ func (dbc *DataBlockChain) Query(requestQuery tendermint.RequestQuery) tendermin
 		value, _ = json.Marshal(state.Dataset.DataList[query.DataIndex].VersionList[query.VersionIndex].Payload)
 	case messages.QueryAcceptedPayload:
 		value, _ = json.Marshal(state.Dataset.DataList[query.DataIndex].VersionList[query.VersionIndex].AcceptedPayload)
+	case messages.QueryBalance:
+		value, _ = json.Marshal(state.Balance.Users)
+	case messages.QueryStake:
+		value, _ = json.Marshal(state.Balance.Validators)
 	}
 	responseQuery := tendermint.ResponseQuery{
 		Code:      uint32(0),
