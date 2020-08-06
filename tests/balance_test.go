@@ -136,13 +136,13 @@ func mockStake(user, userKey, validator, validatorKey []byte, amount int64) *mod
 func TestAddReward(t *testing.T) {
 	balance := initBalance()
 	reward := &modules.Reward{
-		DtRequirer:        requirerPubKey,
-		DtValidator:       validatorPubKey,
-		DtProvider:        providerPubKey,
-		DtAcceptor:        acceptorPubKey,
-		DtValidatorAmount: modules.ToSats(1),
-		DtProviderAmount:  modules.ToSats(5),
-		DtAcceptorAmount:  modules.ToSats(2),
+		Requirer:        requirerPubKey,
+		Validator:       validatorPubKey,
+		Provider:        providerPubKey,
+		Acceptor:        acceptorPubKey,
+		ValidatorAmount: modules.ToSats(1),
+		ProviderAmount:  modules.ToSats(5),
+		AcceptorAmount:  modules.ToSats(2),
 	}
 	balance.AddReward(reward, 1, 3)
 	if len(balance.Rewards) != 1 {
@@ -151,17 +151,17 @@ func TestAddReward(t *testing.T) {
 	if balance.Rewards[[2]int{1, 3}] == nil {
 		t.Errorf("Failed to find the reward")
 	}
-	totalAmount := reward.DtValidatorAmount + reward.DtProviderAmount + reward.DtAcceptorAmount
+	totalAmount := reward.ValidatorAmount + reward.ProviderAmount + reward.AcceptorAmount
 	if balance.Users[hex.EncodeToString(requirerPubKey)] != (initialUsers[hex.EncodeToString(requirerPubKey)] - totalAmount) {
 		t.Errorf("Failed to substract reward amount from requirer")
 	}
-	if balance.Users[hex.EncodeToString(validatorPubKey)] != (initialUsers[hex.EncodeToString(validatorPubKey)] + reward.DtValidatorAmount) {
+	if balance.Users[hex.EncodeToString(validatorPubKey)] != (initialUsers[hex.EncodeToString(validatorPubKey)] + reward.ValidatorAmount) {
 		t.Errorf("Failed to add reward amount to validator")
 	}
-	if balance.Users[hex.EncodeToString(providerPubKey)] != (initialUsers[hex.EncodeToString(providerPubKey)] + reward.DtProviderAmount) {
+	if balance.Users[hex.EncodeToString(providerPubKey)] != (initialUsers[hex.EncodeToString(providerPubKey)] + reward.ProviderAmount) {
 		t.Errorf("Failed to add reward amount to provider")
 	}
-	if balance.Users[hex.EncodeToString(acceptorPubKey)] != (initialUsers[hex.EncodeToString(acceptorPubKey)] + reward.DtAcceptorAmount) {
+	if balance.Users[hex.EncodeToString(acceptorPubKey)] != (initialUsers[hex.EncodeToString(acceptorPubKey)] + reward.AcceptorAmount) {
 		t.Errorf("Failed to add reward amount to acceptor")
 	}
 	validHash := sha256.Sum256(reward.Hash())

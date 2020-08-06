@@ -14,7 +14,7 @@ import (
 // EMPTY DATASET
 
 func TestEmptyDataset(t *testing.T) {
-	dataset := modules.NewDataset(&modules.Dataset{})
+	dataset := modules.NewDataset(&modules.Dataset{}, initBalance())
 	checkNil(dataset.DataList, "Data list", t)
 	validHash := sha256.Sum256(nil)
 	checkHash(dataset.Hash(), validHash[:], "Dataset hash", t)
@@ -58,6 +58,9 @@ func mockDescription() *modules.Description {
 		TrustedValidators: [][]byte{validatorPubKey},
 		Acceptor:          acceptorPubKey,
 		Requirer:          requirerPubKey,
+		ValidatorAmount:   modules.ToSats(1),
+		ProviderAmount:    modules.ToSats(1),
+		AcceptorAmount:    modules.ToSats(1),
 		Signature:         signature,
 	}
 	return &description
@@ -283,7 +286,7 @@ func mockDataset(data, validation, payload bool) *modules.Dataset {
 	} else if !validation {
 		payload = false
 	}
-	dataset := modules.NewDataset(&modules.Dataset{})
+	dataset := modules.NewDataset(&modules.Dataset{}, initBalance())
 	var versionIndex int
 	if data {
 		for zpkIndex, dataIndex := range zpkToData {

@@ -24,10 +24,11 @@ type Empty interface {
 
 type Dataset struct {
 	DataList []Data
+	balance  *Balance
 }
 
-func NewDataset(old *Dataset) *Dataset { // called every new block
-	dataset := &Dataset{}
+func NewDataset(old *Dataset, balance *Balance) *Dataset { // called every new block
+	dataset := &Dataset{balance: balance}
 	for _, oldData := range old.DataList {
 		data := Data{
 			Description: oldData.Description,
@@ -98,8 +99,19 @@ func (dataset *Dataset) AcceptPayload(acceptedPayload *AcceptedPayload, dataInde
 	isSigned := crypto.Verify(acceptedPayload.AcceptorAddr, acceptedPayload.Data, acceptedPayload.Signature)
 	isEmpty := dataset.DataList[dataIndex].VersionList[versionIndex].AcceptedPayload.IsEmpty()
 	if isAcceptor && isSigned && isEmpty {
-		dataset.DataList[dataIndex].VersionList[versionIndex].AcceptedPayload = acceptedPayload
-		dataset.Hash()
+		reward := &Reward{
+			Requirer:        dataset.DataList[dataIndex].Description.Requirer,
+			Validator:       dataset.DataList[dataIndex].VersionList[versionIndex].Validation.ValidatorAddr,
+			Provider:        dataset.DataList[dataIndex].VersionList[versionIndex].Payload.ProviderAddr,
+			Acceptor:        acceptedPayload.AcceptorAddr,
+			ValidatorAmount: dataset.DataList[dataIndex].Description.ValidatorAmount,
+			ProviderAmount:  dataset.DataList[dataIndex].Description.ProviderAmount,
+			AcceptorAmount:  dataset.DataList[dataIndex].Description.AcceptorAmount,
+		}
+		if dataset.balance.AddReward(reward, dataIndex, versionIndex) {
+			dataset.DataList[dataIndex].VersionList[versionIndex].AcceptedPayload = acceptedPayload
+			dataset.Hash()
+		}
 	}
 }
 
@@ -137,13 +149,16 @@ func (data *Data) Hash() []byte {
 	the owner himself or can be left blank if any data from any provider is accepted.
 	Defines an Acceptor, must be a secp256k1 public key, he is responsible for manually checking the data and
 	confirming its conformance to the data requested in DataInfo
-	Contains only arrays of bytes. Can be hashed by adding hashes of every field and hashing the result. */
+	Contains only arrays of bytes (amounts don't count). Can be hashed by adding hashes of every field and hashing the result. */
 type Description struct {
 	ProviderInfo      []byte
 	DataInfo          []byte
 	TrustedValidators [][]byte
 	Acceptor          []byte
 	Requirer          []byte
+	ValidatorAmount   int64
+	ProviderAmount    int64
+	AcceptorAmount    int64
 	Signature         []byte
 }
 

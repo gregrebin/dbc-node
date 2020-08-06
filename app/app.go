@@ -35,12 +35,14 @@ func (state state) hash() []byte {
 var _ tendermint.Application = (*DataBlockChain)(nil)
 
 func NewDataBlockChain(genUsers, genValidators map[string]int64) *DataBlockChain {
+	balance := modules.NewBalance(&modules.Balance{
+		Users:      genUsers,
+		Validators: genValidators,
+	})
+	dataset := modules.NewDataset(&modules.Dataset{}, balance)
 	state := state{
-		Dataset: modules.NewDataset(&modules.Dataset{}),
-		Balance: modules.NewBalance(&modules.Balance{
-			Users:      genUsers,
-			Validators: genValidators,
-		}),
+		Dataset: dataset,
+		Balance: balance,
 	}
 	return &DataBlockChain{
 		Height: 0,
@@ -213,9 +215,11 @@ func (dbc *DataBlockChain) Commit() tendermint.ResponseCommit {
 		dbc.Confirmed = append(dbc.Confirmed, dbc.Committed)
 	}
 	dbc.Committed = dbc.New
+	balance := modules.NewBalance(dbc.Committed.Balance)
+	dataset := modules.NewDataset(dbc.Committed.Dataset, balance)
 	dbc.New = state{
-		Dataset: modules.NewDataset(dbc.Committed.Dataset),
-		Balance: modules.NewBalance(dbc.Committed.Balance),
+		Dataset: dataset,
+		Balance: balance,
 	}
 	dbc.Height++
 	responseCommit := tendermint.ResponseCommit{

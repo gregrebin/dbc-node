@@ -125,19 +125,22 @@ func (balance *Balance) AddStake(stake *Stake) {
 	}
 }
 
-func (balance *Balance) AddReward(reward *Reward, dataIndex, versionIndex int) {
-	dtRequirer := hex.EncodeToString(reward.DtRequirer)
-	totalAmount := reward.DtValidatorAmount + reward.DtProviderAmount + reward.DtAcceptorAmount
+func (balance *Balance) AddReward(reward *Reward, dataIndex, versionIndex int) bool {
+	dtRequirer := hex.EncodeToString(reward.Requirer)
+	totalAmount := reward.ValidatorAmount + reward.ProviderAmount + reward.AcceptorAmount
 	hasBalance := balance.Users[dtRequirer] >= totalAmount
 	if hasBalance {
 		balance.Rewards[[2]int{dataIndex, versionIndex}] = reward
-		dtValidator := hex.EncodeToString(reward.DtValidator)
-		dtProvider := hex.EncodeToString(reward.DtProvider)
-		dtAcceptor := hex.EncodeToString(reward.DtAcceptor)
+		dtValidator := hex.EncodeToString(reward.Validator)
+		dtProvider := hex.EncodeToString(reward.Provider)
+		dtAcceptor := hex.EncodeToString(reward.Acceptor)
 		balance.Users[dtRequirer] -= totalAmount
-		balance.Users[dtValidator] += reward.DtValidatorAmount
-		balance.Users[dtProvider] += reward.DtProviderAmount
-		balance.Users[dtAcceptor] += reward.DtAcceptorAmount
+		balance.Users[dtValidator] += reward.ValidatorAmount
+		balance.Users[dtProvider] += reward.ProviderAmount
+		balance.Users[dtAcceptor] += reward.AcceptorAmount
+		return true
+	} else {
+		return false
 	}
 }
 
@@ -191,22 +194,22 @@ func (stake *Stake) Hash() []byte {
 }
 
 type Reward struct {
-	DtRequirer        []byte
-	DtValidator       []byte
-	DtProvider        []byte
-	DtAcceptor        []byte
-	DtValidatorAmount int64
-	DtProviderAmount  int64
-	DtAcceptorAmount  int64
+	Requirer        []byte
+	Validator       []byte
+	Provider        []byte
+	Acceptor        []byte
+	ValidatorAmount int64
+	ProviderAmount  int64
+	AcceptorAmount  int64
 }
 
 func (reward *Reward) Hash() []byte {
-	sum := append(reward.DtRequirer, reward.DtProvider...)
-	sum = append(sum, reward.DtProvider...)
-	sum = append(sum, reward.DtAcceptor...)
-	sum = append(sum, []byte(strconv.FormatInt(reward.DtValidatorAmount, 10))...)
-	sum = append(sum, []byte(strconv.FormatInt(reward.DtProviderAmount, 10))...)
-	sum = append(sum, []byte(strconv.FormatInt(reward.DtAcceptorAmount, 10))...)
+	sum := append(reward.Requirer, reward.Provider...)
+	sum = append(sum, reward.Provider...)
+	sum = append(sum, reward.Acceptor...)
+	sum = append(sum, []byte(strconv.FormatInt(reward.ValidatorAmount, 10))...)
+	sum = append(sum, []byte(strconv.FormatInt(reward.ProviderAmount, 10))...)
+	sum = append(sum, []byte(strconv.FormatInt(reward.AcceptorAmount, 10))...)
 	hash := sha256.Sum256(sum)
 	return hash[:]
 }
