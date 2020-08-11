@@ -20,21 +20,18 @@ const (
 func ToSats(dbcc int64) int64 { return dbcc * DbccSats }
 
 type Balance struct {
-	Users       map[string]int64
-	Validators  map[string]int64
-	Transfers   []*Transfer
-	Stakes      []*Stake
-	Rewards     map[[2]int]*Reward
-	ConfRewards map[[2]int]bool
-	Fees        []*Fee
+	Users      map[string]int64
+	Validators map[string]int64
+	Transfers  []*Transfer
+	Stakes     []*Stake
+	Rewards    []Reward
+	Fees       []*Fee
 }
 
 func NewBalance(oldBalance *Balance) *Balance {
 	balance := &Balance{
-		Users:       make(map[string]int64),
-		Validators:  make(map[string]int64),
-		Rewards:     make(map[[2]int]*Reward),
-		ConfRewards: make(map[[2]int]bool),
+		Users:      make(map[string]int64),
+		Validators: make(map[string]int64),
 	}
 	for user, value := range oldBalance.Users {
 		balance.Users[user] = value
@@ -48,11 +45,14 @@ func NewBalance(oldBalance *Balance) *Balance {
 	for _, stake := range oldBalance.Stakes {
 		balance.Stakes = append(balance.Stakes, stake)
 	}
-	for reward, value := range oldBalance.Rewards {
-		balance.Rewards[reward] = value
-	}
-	for conf, value := range oldBalance.ConfRewards {
-		balance.ConfRewards[conf] = value
+	for _, oldReward := range oldBalance.Rewards {
+		reward := Reward{
+			Info: oldReward.Info,
+		}
+		for _, confirm := range oldReward.Confirms {
+			reward.Confirms = append(reward.Confirms, confirm)
+		}
+		balance.Rewards = append(balance.Rewards, reward)
 	}
 	for fee, value := range oldBalance.Fees {
 		balance.Fees[fee] = value
@@ -73,13 +73,6 @@ func (balance *Balance) Hash() []byte {
 	}
 	for _, reward := range balance.Rewards {
 		sum = append(sum, reward.Hash()...)
-	}
-	for _, confirmed := range balance.ConfRewards {
-		if confirmed {
-			sum = append(sum, '\xFF')
-		} else {
-			sum = append(sum, '\x00')
-		}
 	}
 	for _, fee := range balance.Fees {
 		sum = append(sum, fee.Hash()...)
@@ -125,27 +118,28 @@ func (balance *Balance) AddStake(stake *Stake) {
 	}
 }
 
-func (balance *Balance) AddReward(reward *Reward, dataIndex, versionIndex int) bool {
-	dtRequirer := hex.EncodeToString(reward.Requirer)
-	totalAmount := reward.ValidatorAmount + reward.ProviderAmount + reward.AcceptorAmount
-	hasBalance := balance.Users[dtRequirer] >= totalAmount
+func (balance *Balance) AddReward(reward Reward, maxConfirms int64) bool {
+	requirer := hex.EncodeToString(reward.Info.Requirer)
+	totalAmount := (reward.Info.ValidatorAmount + reward.Info.ProviderAmount + reward.Info.AcceptorAmount) * maxConfirms
+	hasBalance := balance.Users[requirer] >= totalAmount
 	if hasBalance {
-		balance.Rewards[[2]int{dataIndex, versionIndex}] = reward
-		dtValidator := hex.EncodeToString(reward.Validator)
-		dtProvider := hex.EncodeToString(reward.Provider)
-		dtAcceptor := hex.EncodeToString(reward.Acceptor)
-		balance.Users[dtRequirer] -= totalAmount
-		balance.Users[dtValidator] += reward.ValidatorAmount
-		balance.Users[dtProvider] += reward.ProviderAmount
-		balance.Users[dtAcceptor] += reward.AcceptorAmount
+		balance.Rewards = append(balance.Rewards, reward)
+		balance.Users[requirer] -= totalAmount
 		return true
 	} else {
 		return false
 	}
 }
 
-func (balance *Balance) ConfirmReward(dataIndex, versionIndex int) {
-	balance.ConfRewards[[2]int{dataIndex, versionIndex}] = true
+func (balance *Balance) AddRewardConfirm(confirm *RewardConfirm, index int) {
+	balance.Rewards[index].Confirms = append(balance.Rewards[index].Confirms, confirm)
+	reward := balance.Rewards[index]
+	validator := hex.EncodeToString(reward.Info.Validator)
+	provider := hex.EncodeToString(confirm.Provider)
+	acceptor := hex.EncodeToString(reward.Info.Acceptor)
+	balance.Users[validator] += reward.Info.ValidatorAmount
+	balance.Users[provider] += reward.Info.ProviderAmount
+	balance.Users[acceptor] += reward.Info.AcceptorAmount
 }
 
 func (balance *Balance) AddFee(fee *Fee) {
@@ -194,22 +188,30 @@ func (stake *Stake) Hash() []byte {
 }
 
 type Reward struct {
+	Info     *RewardInfo
+	Confirms []*RewardConfirm
+}
+type RewardInfo struct {
 	Requirer        []byte
 	Validator       []byte
-	Provider        []byte
 	Acceptor        []byte
 	ValidatorAmount int64
 	ProviderAmount  int64
 	AcceptorAmount  int64
 }
+type RewardConfirm struct {
+	Provider []byte
+}
 
-func (reward *Reward) Hash() []byte {
-	sum := append(reward.Requirer, reward.Provider...)
-	sum = append(sum, reward.Provider...)
-	sum = append(sum, reward.Acceptor...)
-	sum = append(sum, []byte(strconv.FormatInt(reward.ValidatorAmount, 10))...)
-	sum = append(sum, []byte(strconv.FormatInt(reward.ProviderAmount, 10))...)
-	sum = append(sum, []byte(strconv.FormatInt(reward.AcceptorAmount, 10))...)
+func (promise *Reward) Hash() []byte {
+	sum := append(promise.Info.Requirer, promise.Info.Validator...)
+	sum = append(sum, promise.Info.Acceptor...)
+	sum = append(sum, []byte(strconv.FormatInt(promise.Info.ValidatorAmount, 10))...)
+	sum = append(sum, []byte(strconv.FormatInt(promise.Info.ProviderAmount, 10))...)
+	sum = append(sum, []byte(strconv.FormatInt(promise.Info.AcceptorAmount, 10))...)
+	for _, confirm := range promise.Confirms {
+		sum = append(sum, confirm.Provider...)
+	}
 	hash := sha256.Sum256(sum)
 	return hash[:]
 }

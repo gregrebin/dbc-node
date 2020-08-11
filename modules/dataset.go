@@ -61,9 +61,21 @@ func (dataset *Dataset) AddData(description *Description) { // called at require
 	id := append(description.ProviderInfo, description.DataInfo...)
 	isSigned := crypto.Verify(description.Requirer, id, description.Signature)
 	if isSigned {
-		data := Data{Description: description}
-		dataset.DataList = append(dataset.DataList, data)
-		dataset.Hash()
+		reward := Reward{
+			Info: &RewardInfo{
+				Requirer:        description.Requirer,
+				Validator:       description.Validator,
+				Acceptor:        description.Acceptor,
+				ValidatorAmount: description.ValidatorAmount,
+				ProviderAmount:  description.ProviderAmount,
+				AcceptorAmount:  description.AcceptorAmount,
+			},
+		}
+		if dataset.balance.AddReward(reward, description.MaxVersions) {
+			data := Data{Description: description}
+			dataset.DataList = append(dataset.DataList, data)
+			dataset.Hash()
+		}
 	}
 }
 func (dataset *Dataset) AddValidation(validation *Validation, dataIndex int) { // called at validateTx
@@ -94,19 +106,12 @@ func (dataset *Dataset) AcceptPayload(acceptedPayload *AcceptedPayload, dataInde
 	isSigned := crypto.Verify(acceptedPayload.AcceptorAddr, acceptedPayload.Data, acceptedPayload.Signature)
 	isEmpty := dataset.DataList[dataIndex].VersionList[versionIndex].AcceptedPayload.IsEmpty()
 	if isAcceptor && isSigned && isEmpty {
-		reward := &Reward{
-			Requirer:        dataset.DataList[dataIndex].Description.Requirer,
-			Validator:       dataset.DataList[dataIndex].VersionList[versionIndex].Validation.ValidatorAddr,
-			Provider:        dataset.DataList[dataIndex].VersionList[versionIndex].Payload.ProviderAddr,
-			Acceptor:        acceptedPayload.AcceptorAddr,
-			ValidatorAmount: dataset.DataList[dataIndex].Description.ValidatorAmount,
-			ProviderAmount:  dataset.DataList[dataIndex].Description.ProviderAmount,
-			AcceptorAmount:  dataset.DataList[dataIndex].Description.AcceptorAmount,
+		confirm := &RewardConfirm{
+			Provider: dataset.DataList[dataIndex].VersionList[versionIndex].Payload.ProviderAddr,
 		}
-		if dataset.balance.AddReward(reward, dataIndex, versionIndex) {
-			dataset.DataList[dataIndex].VersionList[versionIndex].AcceptedPayload = acceptedPayload
-			dataset.Hash()
-		}
+		dataset.balance.AddRewardConfirm(confirm, dataIndex)
+		dataset.DataList[dataIndex].VersionList[versionIndex].AcceptedPayload = acceptedPayload
+		dataset.Hash()
 	}
 }
 
@@ -154,6 +159,7 @@ type Description struct {
 	ValidatorAmount int64
 	ProviderAmount  int64
 	AcceptorAmount  int64
+	MaxVersions     int64
 	Signature       []byte
 }
 
