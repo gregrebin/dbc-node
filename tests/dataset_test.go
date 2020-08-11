@@ -53,15 +53,15 @@ func mockDescription() *modules.Description {
 	dataInfo := []byte(lorem.Sentence(10, 20))
 	signature := crypto.Sign(requirerPrivKey, append(providerInfo, dataInfo...))
 	description := modules.Description{
-		ProviderInfo:      providerInfo,
-		DataInfo:          dataInfo,
-		TrustedValidators: [][]byte{validatorPubKey},
-		Acceptor:          acceptorPubKey,
-		Requirer:          requirerPubKey,
-		ValidatorAmount:   modules.ToSats(1),
-		ProviderAmount:    modules.ToSats(1),
-		AcceptorAmount:    modules.ToSats(1),
-		Signature:         signature,
+		ProviderInfo:    providerInfo,
+		DataInfo:        dataInfo,
+		Validator:       validatorPubKey,
+		Acceptor:        acceptorPubKey,
+		Requirer:        requirerPubKey,
+		ValidatorAmount: modules.ToSats(1),
+		ProviderAmount:  modules.ToSats(1),
+		AcceptorAmount:  modules.ToSats(1),
+		Signature:       signature,
 	}
 	return &description
 }
@@ -73,7 +73,7 @@ func compareDescription(desc1, desc2 *modules.Description, t *testing.T) {
 	if bytes.Compare(desc1.DataInfo, desc2.DataInfo) != 0 {
 		t.Errorf("Corrupted data info")
 	}
-	if bytes.Compare(desc1.TrustedValidators[0], desc2.TrustedValidators[0]) != 0 {
+	if bytes.Compare(desc1.Validator, desc2.Validator) != 0 {
 		t.Errorf("Corrupted trusted validator")
 	}
 	if bytes.Compare(desc1.Acceptor, desc2.Acceptor) != 0 {

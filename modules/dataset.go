@@ -67,14 +67,9 @@ func (dataset *Dataset) AddData(description *Description) { // called at require
 	}
 }
 func (dataset *Dataset) AddValidation(validation *Validation, dataIndex int) { // called at validateTx
-	isTrusted := false
-	for _, trusted := range dataset.DataList[dataIndex].Description.TrustedValidators {
-		if bytes.Compare(validation.ValidatorAddr, trusted) == 0 {
-			isTrusted = true
-		}
-	}
+	isValidator := bytes.Compare(validation.ValidatorAddr, dataset.DataList[dataIndex].Description.Validator) == 0
 	isSigned := crypto.Verify(validation.ValidatorAddr, validation.Info, validation.Signature)
-	if isTrusted && isSigned {
+	if isValidator && isSigned {
 		version := Version{Validation: validation, Payload: &Payload{}, AcceptedPayload: &AcceptedPayload{}}
 		dataset.DataList[dataIndex].VersionList = append(dataset.DataList[dataIndex].VersionList, version)
 		dataset.Hash()
@@ -151,22 +146,20 @@ func (data *Data) Hash() []byte {
 	confirming its conformance to the data requested in DataInfo
 	Contains only arrays of bytes (amounts don't count). Can be hashed by adding hashes of every field and hashing the result. */
 type Description struct {
-	ProviderInfo      []byte
-	DataInfo          []byte
-	TrustedValidators [][]byte
-	Acceptor          []byte
-	Requirer          []byte
-	ValidatorAmount   int64
-	ProviderAmount    int64
-	AcceptorAmount    int64
-	Signature         []byte
+	ProviderInfo    []byte
+	DataInfo        []byte
+	Validator       []byte
+	Acceptor        []byte
+	Requirer        []byte
+	ValidatorAmount int64
+	ProviderAmount  int64
+	AcceptorAmount  int64
+	Signature       []byte
 }
 
 func (description *Description) Hash() []byte {
 	sum := append(description.ProviderInfo, description.DataInfo...)
-	for _, validator := range description.TrustedValidators {
-		sum = append(sum, validator...)
-	}
+	sum = append(sum, description.Validator...)
 	sum = append(sum, description.Acceptor...)
 	sum = append(sum, description.Requirer...)
 	sum = append(sum, description.Signature...)
@@ -248,7 +241,7 @@ func (payload *Payload) IsEmpty() bool {
 
 /*	An arbitrary info or seed known to both validator and provider hashed n times, could be an official ID number,
 	is needed for zero knowledge proof of validation identity.
-	The validator address must be one of secp256k1 public keys provided in (description.TrustedValidators).
+	The validator address must be one of secp256k1 public keys provided in (description.Validator).
 	The Signature must be a valid Signature of (validation.info) for the given key.
 	Contains only arrays of bytes. Can be hashed by adding hashes of every field and hashing the result. */
 type Validation struct {
