@@ -69,9 +69,11 @@ func (dataset *Dataset) AddData(description *Description) { // called at require
 				ValidatorAmount: description.ValidatorAmount,
 				ProviderAmount:  description.ProviderAmount,
 				AcceptorAmount:  description.AcceptorAmount,
+				MaxConfirms:     description.MaxVersions,
 			},
+			State: RewardOpen,
 		}
-		if dataset.balance.AddReward(reward, description.MaxVersions) {
+		if dataset.balance.AddReward(reward) {
 			data := Data{Description: description}
 			dataset.DataList = append(dataset.DataList, data)
 			dataset.Hash()
@@ -109,7 +111,7 @@ func (dataset *Dataset) AcceptPayload(acceptedPayload *AcceptedPayload, dataInde
 		confirm := &RewardConfirm{
 			Provider: dataset.DataList[dataIndex].VersionList[versionIndex].Payload.ProviderAddr,
 		}
-		dataset.balance.AddRewardConfirm(confirm, dataIndex)
+		dataset.balance.ConfirmReward(confirm, dataIndex)
 		dataset.DataList[dataIndex].VersionList[versionIndex].AcceptedPayload = acceptedPayload
 		dataset.Hash()
 	}

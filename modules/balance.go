@@ -47,7 +47,8 @@ func NewBalance(oldBalance *Balance) *Balance {
 	}
 	for _, oldReward := range oldBalance.Rewards {
 		reward := Reward{
-			Info: oldReward.Info,
+			Info:  oldReward.Info,
+			State: oldReward.State,
 		}
 		for _, confirm := range oldReward.Confirms {
 			reward.Confirms = append(reward.Confirms, confirm)
@@ -118,9 +119,9 @@ func (balance *Balance) AddStake(stake *Stake) {
 	}
 }
 
-func (balance *Balance) AddReward(reward Reward, maxConfirms int64) bool {
+func (balance *Balance) AddReward(reward Reward) bool {
 	requirer := hex.EncodeToString(reward.Info.Requirer)
-	totalAmount := (reward.Info.ValidatorAmount + reward.Info.ProviderAmount + reward.Info.AcceptorAmount) * maxConfirms
+	totalAmount := (reward.Info.ValidatorAmount + reward.Info.ProviderAmount + reward.Info.AcceptorAmount) * reward.Info.MaxConfirms
 	hasBalance := balance.Users[requirer] >= totalAmount
 	if hasBalance {
 		balance.Rewards = append(balance.Rewards, reward)
@@ -131,15 +132,30 @@ func (balance *Balance) AddReward(reward Reward, maxConfirms int64) bool {
 	}
 }
 
-func (balance *Balance) AddRewardConfirm(confirm *RewardConfirm, index int) {
-	balance.Rewards[index].Confirms = append(balance.Rewards[index].Confirms, confirm)
-	reward := balance.Rewards[index]
-	validator := hex.EncodeToString(reward.Info.Validator)
-	provider := hex.EncodeToString(confirm.Provider)
-	acceptor := hex.EncodeToString(reward.Info.Acceptor)
-	balance.Users[validator] += reward.Info.ValidatorAmount
-	balance.Users[provider] += reward.Info.ProviderAmount
-	balance.Users[acceptor] += reward.Info.AcceptorAmount
+func (balance *Balance) ConfirmReward(confirm *RewardConfirm, index int) {
+	reward := &balance.Rewards[index]
+	if int64(len(reward.Confirms)) < reward.Info.MaxConfirms && reward.State == RewardOpen {
+		balance.Rewards[index].Confirms = append(balance.Rewards[index].Confirms, confirm)
+		reward := balance.Rewards[index]
+		validator := hex.EncodeToString(reward.Info.Validator)
+		provider := hex.EncodeToString(confirm.Provider)
+		acceptor := hex.EncodeToString(reward.Info.Acceptor)
+		balance.Users[validator] += reward.Info.ValidatorAmount
+		balance.Users[provider] += reward.Info.ProviderAmount
+		balance.Users[acceptor] += reward.Info.AcceptorAmount
+	}
+}
+
+func (balance *Balance) CloseReward(index int) {
+	reward := &balance.Rewards[index]
+	if reward.State == RewardOpen {
+		reward.State = RewardClosed
+		paid := (reward.Info.ValidatorAmount + reward.Info.ProviderAmount + reward.Info.AcceptorAmount) * reward.Info.MaxConfirms
+		due := (reward.Info.ValidatorAmount + reward.Info.ProviderAmount + reward.Info.AcceptorAmount) * int64(len(reward.Confirms))
+		change := paid - due
+		requirer := hex.EncodeToString(reward.Info.Requirer)
+		balance.Users[requirer] += change
+	}
 }
 
 func (balance *Balance) AddFee(fee *Fee) {
@@ -190,6 +206,7 @@ func (stake *Stake) Hash() []byte {
 type Reward struct {
 	Info     *RewardInfo
 	Confirms []*RewardConfirm
+	State    RewardState
 }
 type RewardInfo struct {
 	Requirer        []byte
@@ -198,10 +215,15 @@ type RewardInfo struct {
 	ValidatorAmount int64
 	ProviderAmount  int64
 	AcceptorAmount  int64
+	MaxConfirms     int64
 }
 type RewardConfirm struct {
 	Provider []byte
 }
+type RewardState int8
+
+const RewardOpen RewardState = 0
+const RewardClosed RewardState = 1
 
 func (promise *Reward) Hash() []byte {
 	sum := append(promise.Info.Requirer, promise.Info.Validator...)
@@ -209,6 +231,7 @@ func (promise *Reward) Hash() []byte {
 	sum = append(sum, []byte(strconv.FormatInt(promise.Info.ValidatorAmount, 10))...)
 	sum = append(sum, []byte(strconv.FormatInt(promise.Info.ProviderAmount, 10))...)
 	sum = append(sum, []byte(strconv.FormatInt(promise.Info.AcceptorAmount, 10))...)
+	sum = append(sum, []byte(strconv.FormatInt(promise.Info.MaxConfirms, 10))...)
 	for _, confirm := range promise.Confirms {
 		sum = append(sum, confirm.Provider...)
 	}
