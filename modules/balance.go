@@ -119,16 +119,16 @@ func (balance *Balance) AddStake(stake *Stake) {
 	}
 }
 
-func (balance *Balance) AddReward(reward Reward) bool {
+func (balance *Balance) AddReward(reward Reward) (success bool, index int) {
 	requirer := hex.EncodeToString(reward.Info.Requirer)
 	totalAmount := (reward.Info.ValidatorAmount + reward.Info.ProviderAmount + reward.Info.AcceptorAmount) * reward.Info.MaxConfirms
 	hasBalance := balance.Users[requirer] >= totalAmount
 	if hasBalance {
 		balance.Rewards = append(balance.Rewards, reward)
 		balance.Users[requirer] -= totalAmount
-		return true
+		return true, len(balance.Rewards) - 1
 	} else {
-		return false
+		return false, -1
 	}
 }
 

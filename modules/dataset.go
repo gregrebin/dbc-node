@@ -32,6 +32,7 @@ func NewDataset(old *Dataset, balance *Balance) *Dataset { // called every new b
 	for _, oldData := range old.DataList {
 		data := Data{
 			Description: oldData.Description,
+			Reward:      oldData.Reward,
 		}
 		for _, oldVersion := range oldData.VersionList {
 			version := Version{
@@ -73,8 +74,9 @@ func (dataset *Dataset) AddData(description *Description) { // called at require
 			},
 			State: RewardOpen,
 		}
-		if dataset.balance.AddReward(reward) {
-			data := Data{Description: description}
+		success, index := dataset.balance.AddReward(reward)
+		if success {
+			data := Data{Description: description, Reward: index}
 			dataset.DataList = append(dataset.DataList, data)
 			dataset.Hash()
 		}
@@ -111,7 +113,7 @@ func (dataset *Dataset) AcceptPayload(acceptedPayload *AcceptedPayload, dataInde
 		confirm := &RewardConfirm{
 			Provider: dataset.DataList[dataIndex].VersionList[versionIndex].Payload.ProviderAddr,
 		}
-		dataset.balance.ConfirmReward(confirm, dataIndex)
+		dataset.balance.ConfirmReward(confirm, dataset.DataList[dataIndex].Reward)
 		dataset.DataList[dataIndex].VersionList[versionIndex].AcceptedPayload = acceptedPayload
 		dataset.Hash()
 	}
@@ -129,6 +131,7 @@ func (dataset *Dataset) AcceptPayload(acceptedPayload *AcceptedPayload, dataInde
 type Data struct {
 	Description *Description
 	VersionList []Version
+	Reward      int
 }
 
 func (data *Data) Hash() []byte {

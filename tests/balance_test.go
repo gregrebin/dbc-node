@@ -26,7 +26,7 @@ func TestBalance(t *testing.T) {
 		balance.Users[hex.EncodeToString(acceptorPubKey)] != tokenDistribution["Acceptor"] {
 		t.Errorf("Failed initializing balance users token distribution")
 	}
-	if balance.Transfers != nil && balance.Stakes != nil && balance.Rewards != nil && balance.ConfRewards != nil && balance.Fees != nil {
+	if balance.Transfers != nil && balance.Stakes != nil && balance.Rewards != nil && balance.Fees != nil {
 		t.Errorf("Failed initializing balance transactions list")
 	}
 	validHash := sha256.Sum256(nil)
