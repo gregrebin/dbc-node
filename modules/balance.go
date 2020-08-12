@@ -158,7 +158,7 @@ func (balance *Balance) CloseReward(index int) {
 	}
 }
 
-func (balance *Balance) AddFee(fee *Fee) {
+func (balance *Balance) AddFee(fee *Fee) bool {
 	user := hex.EncodeToString(fee.User)
 	hasBalance := balance.Users[user] >= TxFee
 	if hasBalance {
@@ -166,6 +166,9 @@ func (balance *Balance) AddFee(fee *Fee) {
 		validator := hex.EncodeToString(fee.Validator)
 		balance.Users[user] -= TxFee
 		balance.Validators[validator] += TxFee
+		return true
+	} else {
+		return false
 	}
 }
 

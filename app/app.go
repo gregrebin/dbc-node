@@ -2,6 +2,7 @@ package app
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"dbc-node/messages"
 	"dbc-node/modules"
 	"encoding/base64"
@@ -18,6 +19,7 @@ import (
 
 type DataBlockChain struct {
 	Height    int64
+	Proposer  []byte
 	Confirmed []state // written at 2nd commit
 	Committed state   // written at 1st commit
 	New       state   // written at deliverTx
@@ -149,6 +151,7 @@ func (dbc *DataBlockChain) InitChain(requestInitChain tendermint.RequestInitChai
 }
 
 func (dbc *DataBlockChain) BeginBlock(requestBeginBlock tendermint.RequestBeginBlock) tendermint.ResponseBeginBlock {
+	dbc.Proposer = requestBeginBlock.Header.ProposerAddress
 	responseBeginBlock := tendermint.ResponseBeginBlock{
 		Events: nil,
 	}
@@ -161,25 +164,48 @@ func (dbc *DataBlockChain) DeliverTx(requestDeliverTx tendermint.RequestDeliverT
 	tx = bytes.Trim(tx, "\x00")
 	var transaction messages.Transaction
 	_ = json.Unmarshal(tx, &transaction)
+	txHash := sha256.Sum256(tx)
+	fee := &modules.Fee{
+		Validator: dbc.Proposer,
+		TxHash:    txHash[:],
+	}
 	switch transaction.TxType {
 	case messages.TxAddData:
 		description := transaction.Description
-		dbc.New.Dataset.AddData(description)
+		fee.User = description.Requirer
+		if dbc.New.Balance.AddFee(fee) {
+			dbc.New.Dataset.AddData(description)
+		}
 	case messages.TxAddValidation:
 		validation := transaction.Validation
-		dbc.New.Dataset.AddValidation(validation, transaction.DataIndex)
+		fee.User = validation.ValidatorAddr
+		if dbc.New.Balance.AddFee(fee) {
+			dbc.New.Dataset.AddValidation(validation, transaction.DataIndex)
+		}
 	case messages.TxAddPayload:
 		payload := transaction.Payload
-		dbc.New.Dataset.AddPayload(payload, transaction.DataIndex, transaction.VersionIndex)
+		fee.User = payload.ProviderAddr
+		if dbc.New.Balance.AddFee(fee) {
+			dbc.New.Dataset.AddPayload(payload, transaction.DataIndex, transaction.VersionIndex)
+		}
 	case messages.TxAcceptPayload:
 		acceptedPayload := transaction.AcceptedPayload
-		dbc.New.Dataset.AcceptPayload(acceptedPayload, transaction.DataIndex, transaction.VersionIndex)
+		fee.User = acceptedPayload.AcceptorAddr
+		if dbc.New.Balance.AddFee(fee) {
+			dbc.New.Dataset.AcceptPayload(acceptedPayload, transaction.DataIndex, transaction.VersionIndex)
+		}
 	case messages.TxTransfer:
 		transfer := transaction.Transfer
-		dbc.New.Balance.AddTransfer(transfer)
+		fee.User = transfer.Sender
+		if dbc.New.Balance.AddFee(fee) {
+			dbc.New.Balance.AddTransfer(transfer)
+		}
 	case messages.TxStake:
 		stake := transaction.Stake
-		dbc.New.Balance.AddStake(stake)
+		fee.User = stake.User
+		if dbc.New.Balance.AddFee(fee) {
+			dbc.New.Balance.AddStake(stake)
+		}
 	}
 	responseDeliverTx := tendermint.ResponseDeliverTx{
 		Code:      uint32(0),
