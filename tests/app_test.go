@@ -42,21 +42,25 @@ func checkTx(t *testing.T, dbc *app.DataBlockChain, txType messages.TransactionT
 		if len(dbc.New.Balance.Transfers) != txCount {
 			t.Errorf("Transaction not added")
 		}
-		if dbc.New.Balance.Users[hex.EncodeToString(requirerPubKey)] != (genUsers[hex.EncodeToString(requirerPubKey)] - modules.ToSats(2*int64(txCount))) {
+		if dbc.New.Balance.Users[hex.EncodeToString(validatorPubKey)] !=
+			(genUsers[hex.EncodeToString(validatorPubKey)] - modules.ToSats(2*int64(txCount)) - (modules.TxFee * int64(txCount))) {
 			t.Errorf("Transfer amount not substracted")
 		}
-		if dbc.New.Balance.Users[hex.EncodeToString(acceptorPubKey)] != (genUsers[hex.EncodeToString(acceptorPubKey)] + modules.ToSats(2*int64(txCount))) {
-			t.Errorf("Transfer amount not substracted")
+		if dbc.New.Balance.Users[hex.EncodeToString(acceptorPubKey)] !=
+			(genUsers[hex.EncodeToString(acceptorPubKey)] + modules.ToSats(2*int64(txCount))) {
+			t.Errorf("Transfer amount not added")
 		}
 		_ = dbc.Commit()
 		if len(dbc.New.Balance.Transfers) != txCount {
 			t.Errorf("Transaction not retained")
 		}
-		if dbc.New.Balance.Users[hex.EncodeToString(requirerPubKey)] != (genUsers[hex.EncodeToString(requirerPubKey)] - modules.ToSats(2*int64(txCount))) {
+		if dbc.New.Balance.Users[hex.EncodeToString(validatorPubKey)] !=
+			(genUsers[hex.EncodeToString(validatorPubKey)] - modules.ToSats(2*int64(txCount)) - (modules.TxFee * int64(txCount))) {
 			t.Errorf("Transfer amount not substracted")
 		}
-		if dbc.New.Balance.Users[hex.EncodeToString(acceptorPubKey)] != (genUsers[hex.EncodeToString(acceptorPubKey)] + modules.ToSats(2*int64(txCount))) {
-			t.Errorf("Transfer amount not substracted")
+		if dbc.New.Balance.Users[hex.EncodeToString(acceptorPubKey)] !=
+			(genUsers[hex.EncodeToString(acceptorPubKey)] + modules.ToSats(2*int64(txCount))) {
+			t.Errorf("Transfer amount not added")
 		}
 		_ = dbc.Query(mockRequestQuery())
 
@@ -65,20 +69,24 @@ func checkTx(t *testing.T, dbc *app.DataBlockChain, txType messages.TransactionT
 		if len(dbc.New.Balance.Stakes) != txCount {
 			t.Errorf("Transaction not added")
 		}
-		if dbc.New.Balance.Users[hex.EncodeToString(providerPubKey)] != (genUsers[hex.EncodeToString(providerPubKey)] - modules.ToSats(1*int64(txCount))) {
+		if dbc.New.Balance.Users[hex.EncodeToString(providerPubKey)] !=
+			(genUsers[hex.EncodeToString(providerPubKey)] - modules.ToSats(1*int64(txCount)) - (modules.TxFee * int64(txCount))) {
 			t.Errorf("Stake amount not substracted")
 		}
-		if dbc.New.Balance.Validators[hex.EncodeToString(stakePubKey)] != (genValidators[hex.EncodeToString(stakePubKey)] + modules.ToSats(1*int64(txCount))) {
+		if dbc.New.Balance.Validators[hex.EncodeToString(stakePubKey)] !=
+			(genValidators[hex.EncodeToString(stakePubKey)] + modules.ToSats(1*int64(txCount))) {
 			t.Errorf("Stake amount not added")
 		}
 		_ = dbc.Commit()
 		if len(dbc.New.Balance.Stakes) != txCount {
 			t.Errorf("Transaction not retained")
 		}
-		if dbc.New.Balance.Users[hex.EncodeToString(providerPubKey)] != (genUsers[hex.EncodeToString(providerPubKey)] - modules.ToSats(1*int64(txCount))) {
+		if dbc.New.Balance.Users[hex.EncodeToString(providerPubKey)] !=
+			(genUsers[hex.EncodeToString(providerPubKey)] - modules.ToSats(1*int64(txCount)) - (modules.TxFee * int64(txCount))) {
 			t.Errorf("Stake amount not substracted")
 		}
-		if dbc.New.Balance.Validators[hex.EncodeToString(stakePubKey)] != (genValidators[hex.EncodeToString(stakePubKey)] + modules.ToSats(1*int64(txCount))) {
+		if dbc.New.Balance.Validators[hex.EncodeToString(stakePubKey)] !=
+			(genValidators[hex.EncodeToString(stakePubKey)] + modules.ToSats(1*int64(txCount))) {
 			t.Errorf("Stake amount not added")
 		}
 	}
@@ -112,7 +120,7 @@ func mockRequestDeliverTx(txType messages.TransactionType) types.RequestDeliverT
 		acceptedPayload := mockAcceptedPayload()
 		transaction.AcceptedPayload = acceptedPayload
 	case messages.TxTransfer:
-		transfer := mockTransfer(requirerPubKey, requirerPrivKey, acceptorPubKey, modules.ToSats(2))
+		transfer := mockTransfer(validatorPubKey, validatorPrivKey, acceptorPubKey, modules.ToSats(2))
 		transaction.Transfer = transfer
 	case messages.TxStake:
 		stake := mockStake(providerPubKey, providerPrivKey, stakePubKey, stakePrivKey, modules.ToSats(1))

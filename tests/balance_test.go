@@ -6,6 +6,7 @@ import (
 	"dbc-node/crypto"
 	"dbc-node/modules"
 	"encoding/hex"
+	"reflect"
 	"strconv"
 	"testing"
 	"time"
@@ -133,42 +134,79 @@ func mockStake(user, userKey, validator, validatorKey []byte, amount int64) *mod
 	}
 }
 
-//func TestAddReward(t *testing.T) {
-//	balance := initBalance()
-//	reward := &modules.Reward{
-//		Requirer:        requirerPubKey,
-//		Validator:       validatorPubKey,
-//		Provider:        providerPubKey,
-//		Acceptor:        acceptorPubKey,
-//		ValidatorAmount: modules.ToSats(1),
-//		ProviderAmount:  modules.ToSats(5),
-//		AcceptorAmount:  modules.ToSats(2),
-//	}
-//	balance.AddReward(reward, 1, 3)
-//	if len(balance.Rewards) != 1 {
-//		t.Errorf("Failed to register reward")
-//	}
-//	if balance.Rewards[[2]int{1, 3}] == nil {
-//		t.Errorf("Failed to find the reward")
-//	}
-//	totalAmount := reward.ValidatorAmount + reward.ProviderAmount + reward.AcceptorAmount
-//	if balance.Users[hex.EncodeToString(requirerPubKey)] != (initialUsers[hex.EncodeToString(requirerPubKey)] - totalAmount) {
-//		t.Errorf("Failed to substract reward amount from requirer")
-//	}
-//	if balance.Users[hex.EncodeToString(validatorPubKey)] != (initialUsers[hex.EncodeToString(validatorPubKey)] + reward.ValidatorAmount) {
-//		t.Errorf("Failed to add reward amount to validator")
-//	}
-//	if balance.Users[hex.EncodeToString(providerPubKey)] != (initialUsers[hex.EncodeToString(providerPubKey)] + reward.ProviderAmount) {
-//		t.Errorf("Failed to add reward amount to provider")
-//	}
-//	if balance.Users[hex.EncodeToString(acceptorPubKey)] != (initialUsers[hex.EncodeToString(acceptorPubKey)] + reward.AcceptorAmount) {
-//		t.Errorf("Failed to add reward amount to acceptor")
-//	}
-//	validHash := sha256.Sum256(reward.Hash())
-//	if bytes.Compare(balance.Hash(), validHash[:]) != 0 {
-//		t.Errorf("Incorrect hash after reward")
-//	}
-//}
+func TestAddReward(t *testing.T) {
+	balance := initBalance()
+
+	reward := mockReward()
+	_, rewardIndex := balance.AddReward(reward)
+	if !rewardAdded(balance, reward, rewardIndex) {
+		t.Errorf("Failed to add reward")
+	}
+
+	for i := int64(1); i < reward.Info.MaxConfirms; i++ {
+		confirm := mockConfirm()
+		balance.ConfirmReward(confirm, rewardIndex)
+		if !rewardConfirmed(balance, reward, rewardIndex, i) {
+			t.Errorf("Failed to confirm reward at iteration " + strconv.FormatInt(i, 10))
+		}
+	}
+
+	confirm := mockConfirm()
+	balance.ConfirmReward(confirm, rewardIndex)
+	if rewardConfirmed(balance, reward, rewardIndex, reward.Info.MaxConfirms+1) {
+		t.Errorf("Failed to stop confirming rewards after surpassing max number")
+	}
+
+	reward = mockReward()
+	_, rewardIndex = balance.AddReward(reward)
+	confirm = mockConfirm()
+	balance.ConfirmReward(confirm, rewardIndex)
+	balance.CloseReward(rewardIndex)
+	if rewardConfirmed(balance, reward, rewardIndex, 2) {
+		t.Errorf("Reward confirmed after closing")
+	}
+
+	//validHash := sha256.Sum256(sum)
+	//if bytes.Compare(balance.Hash(), validHash[:]) != 0 {
+	//	t.Errorf("Incorrect hash after reward")
+	//}
+}
+
+func mockReward() modules.Reward {
+	return modules.Reward{
+		Info: &modules.RewardInfo{
+			Requirer:        requirerPubKey,
+			Validator:       validatorPubKey,
+			Acceptor:        acceptorPubKey,
+			ValidatorAmount: modules.ToSats(2),
+			ProviderAmount:  modules.ToSats(5),
+			AcceptorAmount:  modules.ToSats(3),
+			MaxConfirms:     3,
+		},
+	}
+}
+
+func mockConfirm() *modules.RewardConfirm {
+	return &modules.RewardConfirm{
+		Provider: providerPubKey,
+	}
+}
+
+func rewardAdded(balance *modules.Balance, reward modules.Reward, rewardIndex int) bool {
+	cost := (reward.Info.ValidatorAmount + reward.Info.ProviderAmount + reward.Info.AcceptorAmount) * reward.Info.MaxConfirms
+	return reflect.DeepEqual(balance.Rewards[rewardIndex], reward) &&
+		balance.Users[hex.EncodeToString(requirerPubKey)] == (initialUsers[hex.EncodeToString(requirerPubKey)]-cost) &&
+		balance.Users[hex.EncodeToString(validatorPubKey)] == initialUsers[hex.EncodeToString(validatorPubKey)] &&
+		balance.Users[hex.EncodeToString(providerPubKey)] == initialUsers[hex.EncodeToString(providerPubKey)] &&
+		balance.Users[hex.EncodeToString(acceptorPubKey)] == initialUsers[hex.EncodeToString(acceptorPubKey)]
+}
+
+func rewardConfirmed(balance *modules.Balance, reward modules.Reward, rewardIndex int, count int64) bool {
+	return balance.Users[hex.EncodeToString(validatorPubKey)] == (initialUsers[hex.EncodeToString(validatorPubKey)]+(reward.Info.ValidatorAmount*count)) &&
+		balance.Users[hex.EncodeToString(providerPubKey)] == (initialUsers[hex.EncodeToString(providerPubKey)]+(reward.Info.ProviderAmount*count)) &&
+		balance.Users[hex.EncodeToString(acceptorPubKey)] == (initialUsers[hex.EncodeToString(acceptorPubKey)]+(reward.Info.AcceptorAmount*count)) &&
+		len(balance.Rewards[rewardIndex].Confirms) == int(count)
+}
 
 func TestAddFee(t *testing.T) {
 	balance := initBalance()

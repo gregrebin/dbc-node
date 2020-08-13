@@ -55,8 +55,8 @@ func NewBalance(oldBalance *Balance) *Balance {
 		}
 		balance.Rewards = append(balance.Rewards, reward)
 	}
-	for fee, value := range oldBalance.Fees {
-		balance.Fees[fee] = value
+	for _, fee := range oldBalance.Fees {
+		balance.Fees = append(balance.Fees, fee)
 	}
 	return balance
 }

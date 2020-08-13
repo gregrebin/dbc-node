@@ -11,8 +11,7 @@ import (
 	tendermint "github.com/tendermint/tendermint/abci/types"
 )
 
-// TODO: stake & unstake transactions and fees (stake economy)
-// TODO: consensus level payload validation (see: Whitepaper, Multiple Choice Problem)
+// TODO: ZKP in payload acceptance and maybe validation
 // TODO: refactoring, better tests
 // TODO: cosmos sdk integration
 // TODO: ethereum integration

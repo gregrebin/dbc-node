@@ -85,7 +85,7 @@ func init() {
 	// Balance
 	initialUsers = make(map[string]int64, 4)
 	tokenDistribution = map[string]int64{
-		"Requirer":  modules.ToSats(35),
+		"Requirer":  modules.ToSats(65),
 		"Validator": modules.ToSats(5),
 		"Provider":  modules.ToSats(10),
 		"Acceptor":  modules.ToSats(15),
