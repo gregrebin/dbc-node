@@ -23,7 +23,7 @@ func initialize(cmd *cobra.Command, args []string) {
 
 	configuration.LogLevel = "consensus:error,*:info"
 	configuration.RPC.CORSAllowedOrigins = []string{"*"}
-	configuration.RPC.ListenAddress = "tcp://127.0.0.1:26657"
+	configuration.RPC.ListenAddress = "tcp://0.0.0.0:26657"
 	configuration.P2P.AllowDuplicateIP = true
 	configuration.Consensus.CreateEmptyBlocksInterval = time.Duration(10) * time.Second
 	configuration.ValidateBasic()
