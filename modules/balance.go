@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"dbc-node/crypto"
 	"encoding/hex"
+	"errors"
 	"github.com/tendermint/tendermint/crypto/ed25519"
 	"github.com/tendermint/tendermint/types"
 	"strconv"
@@ -91,7 +92,11 @@ func (balance *Balance) Hash() []byte {
 	return hash[:]
 }
 
-func (balance *Balance) AddTransfer(transfer *Transfer) {
+func (balance *Balance) AddTransfer(transfer *Transfer) error {
+	err := transfer.check()
+	if err != nil {
+		return err
+	}
 	id := append(transfer.Sender, transfer.Receiver...)
 	id = append(id, []byte(strconv.FormatInt(transfer.Amount, 10))...)
 	id = append(id, []byte(strconv.FormatInt(transfer.Time, 10))...)
@@ -104,9 +109,14 @@ func (balance *Balance) AddTransfer(transfer *Transfer) {
 		balance.Users[sender] -= transfer.Amount
 		balance.Users[receiver] += transfer.Amount
 	}
+	return nil
 }
 
-func (balance *Balance) AddStake(stake *Stake) {
+func (balance *Balance) AddStake(stake *Stake) error {
+	err := stake.check()
+	if err != nil {
+		return err
+	}
 	id := append(stake.User, stake.Validator...)
 	id = append(id, []byte(strconv.FormatInt(stake.Amount, 10))...)
 	id = append(id, []byte(strconv.FormatInt(stake.Time, 10))...)
@@ -128,6 +138,7 @@ func (balance *Balance) AddStake(stake *Stake) {
 		balance.ValChanges[validator] += stake.Amount
 		balance.registerValAddr(stake.Validator)
 	}
+	return nil
 }
 
 func (balance *Balance) registerValAddr(validator []byte) {
@@ -216,6 +227,18 @@ func (transfer *Transfer) Hash() []byte {
 	return hash[:]
 }
 
+func (transfer *Transfer) check() error {
+	if err := crypto.CheckPubKey(transfer.Sender); err != nil {
+		return err
+	} else if err := crypto.CheckPubKey(transfer.Receiver); err != nil {
+		return err
+	} else if transfer.Amount < 0 {
+		return errors.New("negative transfer amount")
+	} else {
+		return nil
+	}
+}
+
 type Stake struct {
 	User      []byte
 	Validator []byte
@@ -231,6 +254,16 @@ func (stake *Stake) Hash() []byte {
 	sum = append(sum, stake.Signature...)
 	hash := sha256.Sum256(sum)
 	return hash[:]
+}
+
+func (stake *Stake) check() error {
+	if err := crypto.CheckPubKey(stake.User); err != nil {
+		return err
+	} else if err := crypto.CheckEDPubKey(stake.Validator); err != nil {
+		return err
+	} else {
+		return nil
+	}
 }
 
 type Reward struct {

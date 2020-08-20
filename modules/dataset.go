@@ -13,6 +13,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"dbc-node/crypto"
+	"errors"
 )
 
 type Empty interface {
@@ -59,7 +60,11 @@ func (dataset *Dataset) Hash() []byte {
 	return hash[:]
 }
 
-func (dataset *Dataset) AddData(description *Description) { // called at requireTx
+func (dataset *Dataset) AddData(description *Description) error { // called at requireTx
+	err := description.check()
+	if err != nil {
+		return err
+	}
 	id := append(description.ProviderInfo, description.DataInfo...)
 	isSigned := crypto.Verify(description.Requirer, id, description.Signature)
 	if isSigned {
@@ -71,6 +76,7 @@ func (dataset *Dataset) AddData(description *Description) { // called at require
 			dataset.Hash()
 		}
 	}
+	return nil
 }
 
 func createReward(description *Description) Reward {
@@ -88,7 +94,11 @@ func createReward(description *Description) Reward {
 	}
 }
 
-func (dataset *Dataset) AddValidation(validation *Validation, dataIndex int) { // called at validateTx
+func (dataset *Dataset) AddValidation(validation *Validation, dataIndex int) error { // called at validateTx
+	err := validation.check()
+	if err != nil {
+		return err
+	}
 	isValidator := bytes.Compare(validation.ValidatorAddr, dataset.DataList[dataIndex].Description.Validator) == 0
 	isSigned := crypto.Verify(validation.ValidatorAddr, validation.Info, validation.Signature)
 	inRange := int64(len(dataset.DataList[dataIndex].VersionList)) < dataset.DataList[dataIndex].Description.MaxVersions
@@ -97,9 +107,14 @@ func (dataset *Dataset) AddValidation(validation *Validation, dataIndex int) { /
 		dataset.DataList[dataIndex].VersionList = append(dataset.DataList[dataIndex].VersionList, version)
 		dataset.Hash()
 	}
+	return nil
 }
 
-func (dataset *Dataset) AddPayload(payload *Payload, dataIndex int, versionIndex int) { //called at provideTx
+func (dataset *Dataset) AddPayload(payload *Payload, dataIndex int, versionIndex int) error { //called at provideTx
+	err := payload.check()
+	if err != nil {
+		return err
+	}
 	isProved := false
 	proof := sha256.Sum256(payload.Proof)
 	info := dataset.DataList[dataIndex].VersionList[versionIndex].Validation.Info
@@ -112,9 +127,14 @@ func (dataset *Dataset) AddPayload(payload *Payload, dataIndex int, versionIndex
 		dataset.DataList[dataIndex].VersionList[versionIndex].Payload = payload
 		dataset.Hash()
 	}
+	return nil
 }
 
-func (dataset *Dataset) AcceptPayload(acceptedPayload *AcceptedPayload, dataIndex int, versionIndex int) { //called at acceptTx
+func (dataset *Dataset) AcceptPayload(acceptedPayload *AcceptedPayload, dataIndex int, versionIndex int) error { //called at acceptTx
+	err := acceptedPayload.check()
+	if err != nil {
+		return err
+	}
 	isAcceptor := bytes.Compare(acceptedPayload.AcceptorAddr, dataset.DataList[dataIndex].Description.Acceptor) == 0
 	isSigned := crypto.Verify(acceptedPayload.AcceptorAddr, acceptedPayload.Data, acceptedPayload.Signature)
 	isEmpty := dataset.DataList[dataIndex].VersionList[versionIndex].AcceptedPayload.IsEmpty()
@@ -124,6 +144,7 @@ func (dataset *Dataset) AcceptPayload(acceptedPayload *AcceptedPayload, dataInde
 		dataset.DataList[dataIndex].VersionList[versionIndex].AcceptedPayload = acceptedPayload
 		dataset.Hash()
 	}
+	return nil
 }
 
 func createConfirm(version *Version) *RewardConfirm {
@@ -191,6 +212,24 @@ func (description *Description) Hash() []byte {
 	return hash[:]
 }
 
+func (description Description) check() error {
+	if err := crypto.CheckPubKey(description.Requirer); err != nil {
+		return err
+	} else if err := crypto.CheckPubKey(description.Validator); err != nil {
+		return err
+	} else if err := crypto.CheckPubKey(description.Acceptor); err != nil {
+		return nil
+	} else if description.ValidatorAmount < 0 {
+		return errors.New("negative validator amount")
+	} else if description.ProviderAmount < 0 {
+		return errors.New("negative provider amount")
+	} else if description.AcceptorAmount < 0 {
+		return errors.New("negative acceptor amount")
+	} else {
+		return nil
+	}
+}
+
 // ------------------------------------------------------------------------------------------------------------------- //
 // VERSION
 
@@ -232,6 +271,10 @@ func (acceptedPayload *AcceptedPayload) IsEmpty() bool {
 	return acceptedPayload.Data == nil && acceptedPayload.AcceptorAddr == nil && acceptedPayload.Signature == nil
 }
 
+func (acceptedPayload *AcceptedPayload) check() error {
+	return crypto.CheckPubKey(acceptedPayload.AcceptorAddr)
+}
+
 // ------------------------------------------------------------------------------------------------------------------- //
 // PAYLOAD
 
@@ -256,8 +299,13 @@ func (payload *Payload) Hash() []byte {
 	hash := sha256.Sum256(sum)
 	return hash[:]
 }
+
 func (payload *Payload) IsEmpty() bool {
 	return payload.Data == nil && payload.Proof == nil && payload.ProviderAddr == nil && payload.Signature == nil
+}
+
+func (payload *Payload) check() error {
+	return crypto.CheckPubKey(payload.ProviderAddr)
 }
 
 // ------------------------------------------------------------------------------------------------------------------- //
@@ -279,4 +327,8 @@ func (validation *Validation) Hash() []byte {
 	sum = append(sum, validation.Signature...)
 	hash := sha256.Sum256(sum)
 	return hash[:]
+}
+
+func (validation *Validation) check() error {
+	return crypto.CheckPubKey(validation.ValidatorAddr)
 }

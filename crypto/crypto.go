@@ -56,10 +56,20 @@ func Verify(pubKey, message []byte, signature []byte) (signed bool) {
 	return sign.Verify(hash[:], key)
 }
 
+func CheckPubKey(pubKey []byte) error {
+	_, err := btcec.ParsePubKey(pubKey, btcec.S256())
+	return err
+}
+
 func SignED(privKey, message []byte) (signature []byte) {
 	return ed25519.Sign(privKey, message)
 }
 
 func VerifyED(pubKey, message []byte, signature []byte) bool {
 	return ed25519.Verify(pubKey, message, signature)
+}
+
+func CheckEDPubKey(pubKey []byte) error {
+	// TODO: implement ed pub key validation
+	return nil
 }

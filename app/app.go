@@ -168,46 +168,51 @@ func (dbc *DataBlockChain) DeliverTx(requestDeliverTx tendermint.RequestDeliverT
 		ValAddr: dbc.Proposer,
 		TxHash:  txHash[:],
 	}
+	var err error
 	switch transaction.TxType {
 	case messages.TxAddData:
 		description := transaction.Description
 		fee.User = description.Requirer
 		if dbc.New.Balance.AddFee(fee) {
-			dbc.New.Dataset.AddData(description)
+			err = dbc.New.Dataset.AddData(description)
 		}
 	case messages.TxAddValidation:
 		validation := transaction.Validation
 		fee.User = validation.ValidatorAddr
 		if dbc.New.Balance.AddFee(fee) {
-			dbc.New.Dataset.AddValidation(validation, transaction.DataIndex)
+			err = dbc.New.Dataset.AddValidation(validation, transaction.DataIndex)
 		}
 	case messages.TxAddPayload:
 		payload := transaction.Payload
 		fee.User = payload.ProviderAddr
 		if dbc.New.Balance.AddFee(fee) {
-			dbc.New.Dataset.AddPayload(payload, transaction.DataIndex, transaction.VersionIndex)
+			err = dbc.New.Dataset.AddPayload(payload, transaction.DataIndex, transaction.VersionIndex)
 		}
 	case messages.TxAcceptPayload:
 		acceptedPayload := transaction.AcceptedPayload
 		fee.User = acceptedPayload.AcceptorAddr
 		if dbc.New.Balance.AddFee(fee) {
-			dbc.New.Dataset.AcceptPayload(acceptedPayload, transaction.DataIndex, transaction.VersionIndex)
+			err = dbc.New.Dataset.AcceptPayload(acceptedPayload, transaction.DataIndex, transaction.VersionIndex)
 		}
 	case messages.TxTransfer:
 		transfer := transaction.Transfer
 		fee.User = transfer.Sender
 		if dbc.New.Balance.AddFee(fee) {
-			dbc.New.Balance.AddTransfer(transfer)
+			err = dbc.New.Balance.AddTransfer(transfer)
 		}
 	case messages.TxStake:
 		stake := transaction.Stake
 		fee.User = stake.User
 		if dbc.New.Balance.AddFee(fee) {
-			dbc.New.Balance.AddStake(stake)
+			err = dbc.New.Balance.AddStake(stake)
 		}
 	}
+	code := uint32(0)
+	if err != nil {
+		code = 1
+	}
 	responseDeliverTx := tendermint.ResponseDeliverTx{
-		Code:      uint32(0),
+		Code:      code,
 		Data:      nil,
 		Log:       "",
 		Info:      "",
