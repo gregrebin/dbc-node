@@ -85,7 +85,8 @@ func (dataset *Dataset) AddData(description *Description) { // called at require
 func (dataset *Dataset) AddValidation(validation *Validation, dataIndex int) { // called at validateTx
 	isValidator := bytes.Compare(validation.ValidatorAddr, dataset.DataList[dataIndex].Description.Validator) == 0
 	isSigned := crypto.Verify(validation.ValidatorAddr, validation.Info, validation.Signature)
-	if isValidator && isSigned {
+	inRange := int64(len(dataset.DataList[dataIndex].VersionList)) < dataset.DataList[dataIndex].Description.MaxVersions
+	if isValidator && isSigned && inRange {
 		version := Version{Validation: validation, Payload: &Payload{}, AcceptedPayload: &AcceptedPayload{}}
 		dataset.DataList[dataIndex].VersionList = append(dataset.DataList[dataIndex].VersionList, version)
 		dataset.Hash()
