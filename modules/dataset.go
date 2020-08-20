@@ -58,22 +58,12 @@ func (dataset *Dataset) Hash() []byte {
 	hash := sha256.Sum256(sum)
 	return hash[:]
 }
+
 func (dataset *Dataset) AddData(description *Description) { // called at requireTx
 	id := append(description.ProviderInfo, description.DataInfo...)
 	isSigned := crypto.Verify(description.Requirer, id, description.Signature)
 	if isSigned {
-		reward := Reward{
-			Info: &RewardInfo{
-				Requirer:        description.Requirer,
-				Validator:       description.Validator,
-				Acceptor:        description.Acceptor,
-				ValidatorAmount: description.ValidatorAmount,
-				ProviderAmount:  description.ProviderAmount,
-				AcceptorAmount:  description.AcceptorAmount,
-				MaxConfirms:     description.MaxVersions,
-			},
-			State: RewardOpen,
-		}
+		reward := createReward(description)
 		success, index := dataset.balance.AddReward(reward)
 		if success {
 			data := Data{Description: description, Reward: index}
@@ -82,6 +72,22 @@ func (dataset *Dataset) AddData(description *Description) { // called at require
 		}
 	}
 }
+
+func createReward(description *Description) Reward {
+	return Reward{
+		Info: &RewardInfo{
+			Requirer:        description.Requirer,
+			Validator:       description.Validator,
+			Acceptor:        description.Acceptor,
+			ValidatorAmount: description.ValidatorAmount,
+			ProviderAmount:  description.ProviderAmount,
+			AcceptorAmount:  description.AcceptorAmount,
+			MaxConfirms:     description.MaxVersions,
+		},
+		State: RewardOpen,
+	}
+}
+
 func (dataset *Dataset) AddValidation(validation *Validation, dataIndex int) { // called at validateTx
 	isValidator := bytes.Compare(validation.ValidatorAddr, dataset.DataList[dataIndex].Description.Validator) == 0
 	isSigned := crypto.Verify(validation.ValidatorAddr, validation.Info, validation.Signature)
@@ -92,6 +98,7 @@ func (dataset *Dataset) AddValidation(validation *Validation, dataIndex int) { /
 		dataset.Hash()
 	}
 }
+
 func (dataset *Dataset) AddPayload(payload *Payload, dataIndex int, versionIndex int) { //called at provideTx
 	isProved := false
 	proof := sha256.Sum256(payload.Proof)
@@ -106,17 +113,22 @@ func (dataset *Dataset) AddPayload(payload *Payload, dataIndex int, versionIndex
 		dataset.Hash()
 	}
 }
+
 func (dataset *Dataset) AcceptPayload(acceptedPayload *AcceptedPayload, dataIndex int, versionIndex int) { //called at acceptTx
 	isAcceptor := bytes.Compare(acceptedPayload.AcceptorAddr, dataset.DataList[dataIndex].Description.Acceptor) == 0
 	isSigned := crypto.Verify(acceptedPayload.AcceptorAddr, acceptedPayload.Data, acceptedPayload.Signature)
 	isEmpty := dataset.DataList[dataIndex].VersionList[versionIndex].AcceptedPayload.IsEmpty()
 	if isAcceptor && isSigned && isEmpty {
-		confirm := &RewardConfirm{
-			Provider: dataset.DataList[dataIndex].VersionList[versionIndex].Payload.ProviderAddr,
-		}
+		confirm := createConfirm(&dataset.DataList[dataIndex].VersionList[versionIndex])
 		dataset.balance.ConfirmReward(confirm, dataset.DataList[dataIndex].Reward)
 		dataset.DataList[dataIndex].VersionList[versionIndex].AcceptedPayload = acceptedPayload
 		dataset.Hash()
+	}
+}
+
+func createConfirm(version *Version) *RewardConfirm {
+	return &RewardConfirm{
+		Provider: version.Payload.ProviderAddr,
 	}
 }
 
