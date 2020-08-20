@@ -6,6 +6,7 @@ import (
 	"dbc-node/crypto"
 	"dbc-node/modules"
 	"encoding/hex"
+	"github.com/tendermint/tendermint/crypto/ed25519"
 	"reflect"
 	"strconv"
 	"testing"
@@ -211,10 +212,12 @@ func rewardConfirmed(balance *modules.Balance, reward modules.Reward, rewardInde
 func TestAddFee(t *testing.T) {
 	balance := initBalance()
 	hash := sha256.Sum256([]byte("Some transaction bytes"))
+	var stakeKey ed25519.PubKeyEd25519
+	copy(stakeKey[:], stakePubKey)
 	fee := &modules.Fee{
-		User:      requirerPubKey,
-		Validator: stakePubKey,
-		TxHash:    hash[:],
+		User:    requirerPubKey,
+		ValAddr: stakeKey.Address(),
+		TxHash:  hash[:],
 	}
 	balance.AddFee(fee)
 	if len(balance.Fees) != 1 {

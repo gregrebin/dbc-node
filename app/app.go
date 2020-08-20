@@ -165,8 +165,8 @@ func (dbc *DataBlockChain) DeliverTx(requestDeliverTx tendermint.RequestDeliverT
 	_ = json.Unmarshal(tx, &transaction)
 	txHash := sha256.Sum256(tx)
 	fee := &modules.Fee{
-		Validator: dbc.Proposer,
-		TxHash:    txHash[:],
+		ValAddr: dbc.Proposer,
+		TxHash:  txHash[:],
 	}
 	switch transaction.TxType {
 	case messages.TxAddData:
@@ -221,10 +221,10 @@ func (dbc *DataBlockChain) DeliverTx(requestDeliverTx tendermint.RequestDeliverT
 
 func (dbc *DataBlockChain) EndBlock(requestEndBlock tendermint.RequestEndBlock) tendermint.ResponseEndBlock {
 	validatorUpdates := tendermint.ValidatorUpdates{}
-	for _, stake := range dbc.New.Balance.Stakes {
-		validator := stake.Validator
-		stake := dbc.New.Balance.Validators[hex.EncodeToString(validator)]
-		validatorUpdate := tendermint.Ed25519ValidatorUpdate(validator, stake)
+	for validator, _ := range dbc.New.Balance.ValChanges {
+		stake := dbc.New.Balance.Validators[validator]
+		validatorBytes, _ := hex.DecodeString(validator)
+		validatorUpdate := tendermint.Ed25519ValidatorUpdate(validatorBytes, stake)
 		validatorUpdates = append(validatorUpdates, validatorUpdate)
 	}
 	responseEndBlock := tendermint.ResponseEndBlock{

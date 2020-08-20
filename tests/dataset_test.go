@@ -61,6 +61,7 @@ func mockDescription() *modules.Description {
 		ValidatorAmount: modules.ToSats(1),
 		ProviderAmount:  modules.ToSats(1),
 		AcceptorAmount:  modules.ToSats(1),
+		MaxVersions:     4,
 		Signature:       signature,
 	}
 	return &description
