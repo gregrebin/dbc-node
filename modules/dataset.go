@@ -61,96 +61,82 @@ func (dataset *Dataset) Hash() []byte {
 }
 
 func (dataset *Dataset) AddData(description *Description) error { // called at requireTx
-	err := description.check()
+	if err := description.check(); err != nil {
+		return err
+	}
+	if !description.isSigned() {
+		return errors.New("invalid description signature")
+	}
+	err, index := dataset.balance.AddReward(description.reward())
 	if err != nil {
 		return err
 	}
-	id := append(description.ProviderInfo, description.DataInfo...)
-	isSigned := crypto.Verify(description.Requirer, id, description.Signature)
-	if isSigned {
-		reward := createReward(description)
-		success, index := dataset.balance.AddReward(reward)
-		if success {
-			data := Data{Description: description, Reward: index}
-			dataset.DataList = append(dataset.DataList, data)
-			dataset.Hash()
-		}
-	}
+	data := Data{Description: description, Reward: index}
+	dataset.DataList = append(dataset.DataList, data)
+	dataset.Hash()
 	return nil
 }
 
-func createReward(description *Description) Reward {
-	return Reward{
-		Info: &RewardInfo{
-			Requirer:        description.Requirer,
-			Validator:       description.Validator,
-			Acceptor:        description.Acceptor,
-			ValidatorAmount: description.ValidatorAmount,
-			ProviderAmount:  description.ProviderAmount,
-			AcceptorAmount:  description.AcceptorAmount,
-			MaxConfirms:     description.MaxVersions,
-		},
-		State: RewardOpen,
-	}
-}
-
 func (dataset *Dataset) AddValidation(validation *Validation, dataIndex int) error { // called at validateTx
-	err := validation.check()
-	if err != nil {
+	if err := validation.check(); err != nil {
 		return err
 	}
-	isValidator := bytes.Compare(validation.ValidatorAddr, dataset.DataList[dataIndex].Description.Validator) == 0
-	isSigned := crypto.Verify(validation.ValidatorAddr, validation.Info, validation.Signature)
-	inRange := int64(len(dataset.DataList[dataIndex].VersionList)) < dataset.DataList[dataIndex].Description.MaxVersions
-	if isValidator && isSigned && inRange {
-		version := Version{Validation: validation, Payload: &Payload{}, AcceptedPayload: &AcceptedPayload{}}
-		dataset.DataList[dataIndex].VersionList = append(dataset.DataList[dataIndex].VersionList, version)
-		dataset.Hash()
+	if !validation.isSigned() {
+		return errors.New("invalid validation signature")
 	}
+	data := &dataset.DataList[dataIndex]
+	if !data.isValidator(validation) {
+		return errors.New("validator not approved")
+	}
+	if !data.inRange() {
+		return errors.New("reached max versions limit")
+	}
+	version := Version{Validation: validation, Payload: &Payload{}, AcceptedPayload: &AcceptedPayload{}}
+	data.VersionList = append(data.VersionList, version)
+	dataset.Hash()
 	return nil
 }
 
 func (dataset *Dataset) AddPayload(payload *Payload, dataIndex int, versionIndex int) error { //called at provideTx
-	err := payload.check()
-	if err != nil {
+	if err := payload.check(); err != nil {
 		return err
 	}
-	isProved := false
-	proof := sha256.Sum256(payload.Proof)
-	info := dataset.DataList[dataIndex].VersionList[versionIndex].Validation.Info
-	if bytes.Compare(proof[:], info) == 0 {
-		isProved = true
+	if !payload.isSigned() {
+		return errors.New("invalid payload signature")
 	}
-	isSigned := crypto.Verify(payload.ProviderAddr, append(payload.Data, payload.Proof...), payload.Signature)
-	isEmpty := dataset.DataList[dataIndex].VersionList[versionIndex].Payload.IsEmpty()
-	if isProved && isSigned && isEmpty {
-		dataset.DataList[dataIndex].VersionList[versionIndex].Payload = payload
-		dataset.Hash()
+	version := &dataset.DataList[dataIndex].VersionList[versionIndex]
+	if !version.prove(payload) {
+		return errors.New("invalid payload proof")
 	}
+	if !version.Payload.IsEmpty() {
+		return errors.New("payload already exists")
+	}
+	version.Payload = payload
+	dataset.Hash()
 	return nil
 }
 
 func (dataset *Dataset) AcceptPayload(acceptedPayload *AcceptedPayload, dataIndex int, versionIndex int) error { //called at acceptTx
-	err := acceptedPayload.check()
-	if err != nil {
+	if err := acceptedPayload.check(); err != nil {
 		return err
 	}
-	isAcceptor := bytes.Compare(acceptedPayload.AcceptorAddr, dataset.DataList[dataIndex].Description.Acceptor) == 0
-	isSigned := crypto.Verify(acceptedPayload.AcceptorAddr, acceptedPayload.Data, acceptedPayload.Signature)
-	isEmpty := dataset.DataList[dataIndex].VersionList[versionIndex].AcceptedPayload.IsEmpty()
-	if isAcceptor && isSigned && isEmpty {
-		confirm := createConfirm(&dataset.DataList[dataIndex].VersionList[versionIndex])
-		dataset.balance.ConfirmReward(confirm, dataset.DataList[dataIndex].Reward)
-		dataset.DataList[dataIndex].VersionList[versionIndex].AcceptedPayload = acceptedPayload
-		dataset.Hash()
+	if !acceptedPayload.isSigned() {
+		return errors.New("invalid accepted payload signature")
 	}
+	data := &dataset.DataList[dataIndex]
+	if !data.isAcceptor(acceptedPayload) {
+		return errors.New("acceptor not approved")
+	}
+	version := &data.VersionList[versionIndex]
+	if !version.AcceptedPayload.IsEmpty() {
+		return errors.New("accepted payload already exists")
+	}
+	if err := dataset.balance.ConfirmReward(version.rewardConfirm(), data.Reward); err != nil {
+		return err
+	}
+	version.AcceptedPayload = acceptedPayload
+	dataset.Hash()
 	return nil
-}
-
-func createConfirm(version *Version) *RewardConfirm {
-	return &RewardConfirm{
-		Provider: version.Payload.ProviderAddr,
-	}
 }
 
 // ------------------------------------------------------------------------------------------------------------------- //
@@ -175,6 +161,18 @@ func (data *Data) Hash() []byte {
 	}
 	hash := sha256.Sum256(sum)
 	return hash[:]
+}
+
+func (data *Data) isValidator(validation *Validation) bool {
+	return bytes.Compare(validation.ValidatorAddr, data.Description.Validator) == 0
+}
+
+func (data *Data) isAcceptor(acceptedPayload *AcceptedPayload) bool {
+	return bytes.Compare(acceptedPayload.AcceptorAddr, data.Description.Acceptor) == 0
+}
+
+func (data *Data) inRange() bool {
+	return int64(len(data.VersionList)) < data.Description.MaxVersions
 }
 
 // ------------------------------------------------------------------------------------------------------------------- //
@@ -230,6 +228,26 @@ func (description Description) check() error {
 	}
 }
 
+func (description *Description) isSigned() bool {
+	id := append(description.ProviderInfo, description.DataInfo...)
+	return crypto.Verify(description.Requirer, id, description.Signature)
+}
+
+func (description *Description) reward() Reward {
+	return Reward{
+		Info: &RewardInfo{
+			Requirer:        description.Requirer,
+			Validator:       description.Validator,
+			Acceptor:        description.Acceptor,
+			ValidatorAmount: description.ValidatorAmount,
+			ProviderAmount:  description.ProviderAmount,
+			AcceptorAmount:  description.AcceptorAmount,
+			MaxConfirms:     description.MaxVersions,
+		},
+		State: RewardOpen,
+	}
+}
+
 // ------------------------------------------------------------------------------------------------------------------- //
 // VERSION
 
@@ -245,6 +263,18 @@ func (version *Version) Hash() []byte {
 	sum = append(sum, version.Validation.Hash()...)
 	hash := sha256.Sum256(sum)
 	return hash[:]
+}
+
+func (version *Version) prove(payload *Payload) bool {
+	proof := sha256.Sum256(payload.Proof)
+	info := version.Validation.Info
+	return bytes.Compare(proof[:], info) == 0
+}
+
+func (version *Version) rewardConfirm() *RewardConfirm {
+	return &RewardConfirm{
+		Provider: version.Payload.ProviderAddr,
+	}
 }
 
 // ------------------------------------------------------------------------------------------------------------------- //
@@ -273,6 +303,10 @@ func (acceptedPayload *AcceptedPayload) IsEmpty() bool {
 
 func (acceptedPayload *AcceptedPayload) check() error {
 	return crypto.CheckPubKey(acceptedPayload.AcceptorAddr)
+}
+
+func (acceptedPayload *AcceptedPayload) isSigned() bool {
+	return crypto.Verify(acceptedPayload.AcceptorAddr, acceptedPayload.Data, acceptedPayload.Signature)
 }
 
 // ------------------------------------------------------------------------------------------------------------------- //
@@ -308,6 +342,10 @@ func (payload *Payload) check() error {
 	return crypto.CheckPubKey(payload.ProviderAddr)
 }
 
+func (payload *Payload) isSigned() bool {
+	return crypto.Verify(payload.ProviderAddr, append(payload.Data, payload.Proof...), payload.Signature)
+}
+
 // ------------------------------------------------------------------------------------------------------------------- //
 // VALIDATION
 
@@ -331,4 +369,8 @@ func (validation *Validation) Hash() []byte {
 
 func (validation *Validation) check() error {
 	return crypto.CheckPubKey(validation.ValidatorAddr)
+}
+
+func (validation *Validation) isSigned() bool {
+	return crypto.Verify(validation.ValidatorAddr, validation.Info, validation.Signature)
 }

@@ -21,6 +21,9 @@ const (
 
 func ToSats(dbcc int64) int64 { return dbcc * DbccSats }
 
+// ------------------------------------------------------------------------------------------------------------------- //
+// BALANCE
+
 type Balance struct {
 	Users      map[string]int64
 	Validators map[string]int64
@@ -93,52 +96,101 @@ func (balance *Balance) Hash() []byte {
 }
 
 func (balance *Balance) AddTransfer(transfer *Transfer) error {
-	err := transfer.check()
-	if err != nil {
+	if err := transfer.check(); err != nil {
 		return err
 	}
-	id := append(transfer.Sender, transfer.Receiver...)
-	id = append(id, []byte(strconv.FormatInt(transfer.Amount, 10))...)
-	id = append(id, []byte(strconv.FormatInt(transfer.Time, 10))...)
-	isSigned := crypto.Verify(transfer.Sender, id, transfer.Signature)
-	sender := hex.EncodeToString(transfer.Sender)
-	hasBalance := balance.Users[sender] >= transfer.Amount
-	if isSigned && hasBalance {
-		balance.Transfers = append(balance.Transfers, transfer)
-		receiver := hex.EncodeToString(transfer.Receiver)
-		balance.Users[sender] -= transfer.Amount
-		balance.Users[receiver] += transfer.Amount
+	if !transfer.isSigned() {
+		return errors.New("invalid transfer signature")
 	}
+	if !balance.hasBalance(transfer.Sender, transfer.Amount) {
+		return errors.New("insufficient balance")
+	}
+	balance.Transfers = append(balance.Transfers, transfer)
+	sender := hex.EncodeToString(transfer.Sender)
+	balance.Users[sender] -= transfer.Amount
+	receiver := hex.EncodeToString(transfer.Receiver)
+	balance.Users[receiver] += transfer.Amount
 	return nil
 }
 
 func (balance *Balance) AddStake(stake *Stake) error {
-	err := stake.check()
-	if err != nil {
+	if err := stake.check(); err != nil {
 		return err
 	}
-	id := append(stake.User, stake.Validator...)
-	id = append(id, []byte(strconv.FormatInt(stake.Amount, 10))...)
-	id = append(id, []byte(strconv.FormatInt(stake.Time, 10))...)
-	isSigned := false
-	hasBalance := false
+	if isSigned := stake.isSigned(); !isSigned {
+		return errors.New("invalid stake signature")
+	}
+	if stake.Amount >= 0 && !balance.hasBalance(stake.User, stake.Amount) {
+		return errors.New("insufficient balance")
+	}
+	if stake.Amount < 0 && !balance.hasStake(stake.Validator, -stake.Amount) {
+		return errors.New("insufficient stake")
+	}
+	balance.Stakes = append(balance.Stakes, stake)
 	user := hex.EncodeToString(stake.User)
+	balance.Users[user] -= stake.Amount
 	validator := hex.EncodeToString(stake.Validator)
-	if stake.Amount > 0 {
-		isSigned = crypto.Verify(stake.User, id, stake.Signature)
-		hasBalance = balance.Users[user] >= stake.Amount
-	} else if stake.Amount < 0 {
-		isSigned = crypto.VerifyED(stake.Validator, id, stake.Signature)
-		hasBalance = balance.Validators[validator] >= -stake.Amount
-	}
-	if isSigned && hasBalance {
-		balance.Stakes = append(balance.Stakes, stake)
-		balance.Users[user] -= stake.Amount
-		balance.Validators[validator] += stake.Amount
-		balance.ValChanges[validator] += stake.Amount
-		balance.registerValAddr(stake.Validator)
-	}
+	balance.Validators[validator] += stake.Amount
+	balance.ValChanges[validator] += stake.Amount
+	balance.registerValAddr(stake.Validator)
 	return nil
+}
+
+func (balance *Balance) AddReward(reward Reward) (error, int) {
+	if !balance.hasBalance(reward.Info.Requirer, reward.totalAmount()) {
+		return errors.New("insufficient balance"), 0
+	}
+	balance.Rewards = append(balance.Rewards, reward)
+	requirer := hex.EncodeToString(reward.Info.Requirer)
+	balance.Users[requirer] -= reward.totalAmount()
+	return nil, len(balance.Rewards) - 1
+}
+
+func (balance *Balance) ConfirmReward(confirm *RewardConfirm, index int) error {
+	reward := &balance.Rewards[index]
+	if !reward.inRange() {
+		return errors.New("reached max confirms limit or reward is closed")
+	}
+	balance.Rewards[index].Confirms = append(balance.Rewards[index].Confirms, confirm)
+	validator := hex.EncodeToString(reward.Info.Validator)
+	balance.Users[validator] += reward.Info.ValidatorAmount
+	provider := hex.EncodeToString(confirm.Provider)
+	balance.Users[provider] += reward.Info.ProviderAmount
+	acceptor := hex.EncodeToString(reward.Info.Acceptor)
+	balance.Users[acceptor] += reward.Info.AcceptorAmount
+	return nil
+}
+
+func (balance *Balance) CloseReward(index int) error {
+	reward := &balance.Rewards[index]
+	if reward.State == RewardClosed {
+		return errors.New("reward closed")
+	}
+	requirer := hex.EncodeToString(reward.Info.Requirer)
+	balance.Users[requirer] += reward.onCloseReturn()
+	reward.State = RewardClosed
+	return nil
+}
+
+func (balance *Balance) AddFee(fee *Fee) error {
+	if !balance.hasBalance(fee.User, TxFee) {
+		return errors.New("insufficient balance")
+	}
+	balance.Fees = append(balance.Fees, fee)
+	user := hex.EncodeToString(fee.User)
+	balance.Users[user] -= TxFee
+	validator := hex.EncodeToString(balance.searchValAddr(fee.ValAddr))
+	balance.Validators[validator] += TxFee
+	balance.ValChanges[validator] += TxFee
+	return nil
+}
+
+func (balance *Balance) hasBalance(user []byte, amount int64) bool {
+	return balance.Users[hex.EncodeToString(user)] >= amount
+}
+
+func (balance *Balance) hasStake(validator []byte, amount int64) bool {
+	return balance.Validators[hex.EncodeToString(validator)] >= amount
 }
 
 func (balance *Balance) registerValAddr(validator []byte) {
@@ -149,66 +201,15 @@ func (balance *Balance) registerValAddr(validator []byte) {
 	balance.ValAddr[address] = pubKey
 }
 
-func (balance *Balance) AddReward(reward Reward) (success bool, index int) {
-	requirer := hex.EncodeToString(reward.Info.Requirer)
-	totalAmount := (reward.Info.ValidatorAmount + reward.Info.ProviderAmount + reward.Info.AcceptorAmount) * reward.Info.MaxConfirms
-	hasBalance := balance.Users[requirer] >= totalAmount
-	if hasBalance {
-		balance.Rewards = append(balance.Rewards, reward)
-		balance.Users[requirer] -= totalAmount
-		return true, len(balance.Rewards) - 1
-	} else {
-		return false, -1
-	}
-}
-
-func (balance *Balance) ConfirmReward(confirm *RewardConfirm, index int) {
-	reward := &balance.Rewards[index]
-	if int64(len(reward.Confirms)) < reward.Info.MaxConfirms && reward.State == RewardOpen {
-		balance.Rewards[index].Confirms = append(balance.Rewards[index].Confirms, confirm)
-		reward := balance.Rewards[index]
-		validator := hex.EncodeToString(reward.Info.Validator)
-		provider := hex.EncodeToString(confirm.Provider)
-		acceptor := hex.EncodeToString(reward.Info.Acceptor)
-		balance.Users[validator] += reward.Info.ValidatorAmount
-		balance.Users[provider] += reward.Info.ProviderAmount
-		balance.Users[acceptor] += reward.Info.AcceptorAmount
-	}
-}
-
-func (balance *Balance) CloseReward(index int) {
-	reward := &balance.Rewards[index]
-	if reward.State == RewardOpen {
-		reward.State = RewardClosed
-		paid := (reward.Info.ValidatorAmount + reward.Info.ProviderAmount + reward.Info.AcceptorAmount) * reward.Info.MaxConfirms
-		due := (reward.Info.ValidatorAmount + reward.Info.ProviderAmount + reward.Info.AcceptorAmount) * int64(len(reward.Confirms))
-		change := paid - due
-		requirer := hex.EncodeToString(reward.Info.Requirer)
-		balance.Users[requirer] += change
-	}
-}
-
-func (balance *Balance) AddFee(fee *Fee) bool {
-	user := hex.EncodeToString(fee.User)
-	hasBalance := balance.Users[user] >= TxFee
-	if hasBalance {
-		balance.Fees = append(balance.Fees, fee)
-		validator := hex.EncodeToString(balance.searchValAddr(fee.ValAddr))
-		balance.Users[user] -= TxFee
-		balance.Validators[validator] += TxFee
-		balance.ValChanges[validator] += TxFee
-		return true
-	} else {
-		return false
-	}
-}
-
 func (balance *Balance) searchValAddr(address []byte) []byte {
 	var valAddr [20]byte
 	copy(valAddr[:], address)
 	validator := balance.ValAddr[valAddr]
 	return validator[:]
 }
+
+// ------------------------------------------------------------------------------------------------------------------- //
+// TRANSFER
 
 type Transfer struct {
 	Sender    []byte
@@ -239,6 +240,16 @@ func (transfer *Transfer) check() error {
 	}
 }
 
+func (transfer *Transfer) isSigned() bool {
+	id := append(transfer.Sender, transfer.Receiver...)
+	id = append(id, []byte(strconv.FormatInt(transfer.Amount, 10))...)
+	id = append(id, []byte(strconv.FormatInt(transfer.Time, 10))...)
+	return crypto.Verify(transfer.Sender, id, transfer.Signature)
+}
+
+// ------------------------------------------------------------------------------------------------------------------- //
+// STAKE
+
 type Stake struct {
 	User      []byte
 	Validator []byte
@@ -266,11 +277,26 @@ func (stake *Stake) check() error {
 	}
 }
 
+func (stake *Stake) isSigned() bool {
+	id := append(stake.User, stake.Validator...)
+	id = append(id, []byte(strconv.FormatInt(stake.Amount, 10))...)
+	id = append(id, []byte(strconv.FormatInt(stake.Time, 10))...)
+	if stake.Amount >= 0 {
+		return crypto.Verify(stake.User, id, stake.Signature)
+	} else {
+		return crypto.VerifyED(stake.Validator, id, stake.Signature)
+	}
+}
+
+// ------------------------------------------------------------------------------------------------------------------- //
+// REWARD
+
 type Reward struct {
 	Info     *RewardInfo
 	Confirms []*RewardConfirm
 	State    RewardState
 }
+
 type RewardInfo struct {
 	Requirer        []byte
 	Validator       []byte
@@ -280,27 +306,46 @@ type RewardInfo struct {
 	AcceptorAmount  int64
 	MaxConfirms     int64
 }
+
 type RewardConfirm struct {
 	Provider []byte
 }
+
 type RewardState int8
 
 const RewardOpen RewardState = 0
 const RewardClosed RewardState = 1
 
-func (promise *Reward) Hash() []byte {
-	sum := append(promise.Info.Requirer, promise.Info.Validator...)
-	sum = append(sum, promise.Info.Acceptor...)
-	sum = append(sum, []byte(strconv.FormatInt(promise.Info.ValidatorAmount, 10))...)
-	sum = append(sum, []byte(strconv.FormatInt(promise.Info.ProviderAmount, 10))...)
-	sum = append(sum, []byte(strconv.FormatInt(promise.Info.AcceptorAmount, 10))...)
-	sum = append(sum, []byte(strconv.FormatInt(promise.Info.MaxConfirms, 10))...)
-	for _, confirm := range promise.Confirms {
+func (reward *Reward) Hash() []byte {
+	sum := append(reward.Info.Requirer, reward.Info.Validator...)
+	sum = append(sum, reward.Info.Acceptor...)
+	sum = append(sum, []byte(strconv.FormatInt(reward.Info.ValidatorAmount, 10))...)
+	sum = append(sum, []byte(strconv.FormatInt(reward.Info.ProviderAmount, 10))...)
+	sum = append(sum, []byte(strconv.FormatInt(reward.Info.AcceptorAmount, 10))...)
+	sum = append(sum, []byte(strconv.FormatInt(reward.Info.MaxConfirms, 10))...)
+	for _, confirm := range reward.Confirms {
 		sum = append(sum, confirm.Provider...)
 	}
 	hash := sha256.Sum256(sum)
 	return hash[:]
 }
+
+func (reward *Reward) totalAmount() int64 {
+	return (reward.Info.ValidatorAmount + reward.Info.ProviderAmount + reward.Info.AcceptorAmount) * reward.Info.MaxConfirms
+}
+
+func (reward *Reward) inRange() bool {
+	return int64(len(reward.Confirms)) < reward.Info.MaxConfirms && reward.State == RewardOpen
+}
+
+func (reward *Reward) onCloseReturn() int64 {
+	paid := (reward.Info.ValidatorAmount + reward.Info.ProviderAmount + reward.Info.AcceptorAmount) * reward.Info.MaxConfirms
+	due := (reward.Info.ValidatorAmount + reward.Info.ProviderAmount + reward.Info.AcceptorAmount) * int64(len(reward.Confirms))
+	return paid - due
+}
+
+// ------------------------------------------------------------------------------------------------------------------- //
+// FEE
 
 type Fee struct {
 	User    []byte

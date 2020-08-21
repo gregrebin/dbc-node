@@ -4,6 +4,7 @@ import (
 	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/pem"
+	"errors"
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/tendermint/tendermint/crypto"
 	"io/ioutil"
@@ -36,14 +37,14 @@ func LoadTmKeys(privTmKey crypto.PrivKey, pubTmKey crypto.PubKey) (privKey []byt
 	return
 }
 
-func Sign(privKey, message []byte) (signature []byte) {
+func Sign(privKey, message []byte) []byte {
 	hash := sha256.Sum256(message)
 	key, _ := btcec.PrivKeyFromBytes(btcec.S256(), privKey)
 	sign, _ := key.Sign(hash[:])
 	return sign.Serialize()
 }
 
-func Verify(pubKey, message []byte, signature []byte) (signed bool) {
+func Verify(pubKey, message []byte, signature []byte) bool {
 	hash := sha256.Sum256(message)
 	key, err := btcec.ParsePubKey(pubKey, btcec.S256())
 	if err != nil {
@@ -61,7 +62,7 @@ func CheckPubKey(pubKey []byte) error {
 	return err
 }
 
-func SignED(privKey, message []byte) (signature []byte) {
+func SignED(privKey, message []byte) []byte {
 	return ed25519.Sign(privKey, message)
 }
 
@@ -70,6 +71,8 @@ func VerifyED(pubKey, message []byte, signature []byte) bool {
 }
 
 func CheckEDPubKey(pubKey []byte) error {
-	// TODO: implement ed pub key validation
+	if len(pubKey) != ed25519.PublicKeySize {
+		return errors.New("invalid public ed25519 key length")
+	}
 	return nil
 }
