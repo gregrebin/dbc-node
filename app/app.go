@@ -209,14 +209,19 @@ func (dbc *DataBlockChain) DeliverTx(requestDeliverTx tendermint.RequestDeliverT
 		}
 	}
 	code := uint32(0)
-	if txErr != nil || feeErr != nil {
+	feedback := "transaction delivered successfully"
+	if feeErr != nil {
 		code = 1
+		feedback = feeErr.Error()
+	} else if txErr != nil {
+		code = 1
+		feedback = txErr.Error()
 	}
 	responseDeliverTx := tendermint.ResponseDeliverTx{
 		Code:      code,
 		Data:      nil,
-		Log:       "",
-		Info:      "",
+		Log:       feedback,
+		Info:      feedback,
 		GasWanted: 0,
 		GasUsed:   0,
 		Events:    nil,
